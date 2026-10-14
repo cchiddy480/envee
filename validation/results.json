@@ -1,0 +1,485 @@
+{
+  "local": [
+    {
+      "preset": "web",
+      "environment": "local",
+      "minimal_options": false,
+      "passed": true,
+      "files_sha256": "93ba575139c63e5fc0220426b926cd6aafcd71850a674294f995c69578168143",
+      "seconds": 32.45
+    },
+    {
+      "preset": "flask",
+      "environment": "local",
+      "minimal_options": false,
+      "passed": true,
+      "files_sha256": "bd74c9616188ef80ab4d2a472cbdf94310dac59a071b7330e34fdeca151c4748",
+      "seconds": 14.89
+    },
+    {
+      "preset": "fastapi",
+      "environment": "local",
+      "minimal_options": false,
+      "passed": true,
+      "files_sha256": "e289a3ccbff1441c9e5d733cc214be9345890ed216e676acff3c31eff108118e",
+      "seconds": 15.14
+    },
+    {
+      "preset": "azure",
+      "environment": "local",
+      "minimal_options": false,
+      "passed": true,
+      "files_sha256": "99bda39ddd98b980a27afb99f685e0804864904eac0d33ee02ddc81d93cfac9f",
+      "seconds": 12.28
+    },
+    {
+      "preset": "fullstack-flask",
+      "environment": "local",
+      "minimal_options": false,
+      "passed": true,
+      "files_sha256": "40a375539f8e7c2d4bcc8d0225c4e48e2763a373e423249b326734af67a13695",
+      "seconds": 29.11
+    },
+    {
+      "preset": "fullstack-fastapi",
+      "environment": "local",
+      "minimal_options": false,
+      "passed": true,
+      "files_sha256": "c9527dc530e83c9ece43de39706e5bc770b6419901a622ef2d2ba6f629762659",
+      "seconds": 31.26
+    },
+    {
+      "preset": "fullstack-azure",
+      "environment": "local",
+      "minimal_options": false,
+      "passed": true,
+      "files_sha256": "70364dc5f46ad5da8bf33afe8645114f36574520915100b811bc51a80b1ac302",
+      "seconds": 27.21
+    },
+    {
+      "preset": "cli",
+      "environment": "local",
+      "minimal_options": false,
+      "passed": true,
+      "files_sha256": "2c9150025fdc0077a7b45918899f874f8ed7520b05a2bfe0d2514375f11142e8",
+      "seconds": 8.54
+    },
+    {
+      "preset": "python",
+      "environment": "local",
+      "minimal_options": false,
+      "passed": true,
+      "files_sha256": "dab97a75dcc2d2619f516505b1afdb722e70c9cf4bb28eec9d7a285dccf6b411",
+      "seconds": 6.99
+    },
+    {
+      "preset": "typescript",
+      "environment": "local",
+      "minimal_options": false,
+      "passed": true,
+      "files_sha256": "7ab5dbc1e7bb6c8ba42da8b11f2b033f643a50b3b3076c3a66107fd2cd6437c5",
+      "seconds": 7.98
+    }
+  ],
+  "docker": [
+    {
+      "preset": "web",
+      "environment": "docker",
+      "minimal_options": false,
+      "passed": true,
+      "files_sha256": "4fdd84251f557d2aba79f919e44cd92ad4f9aaf7d0f0d3d16eef2db472909a36",
+      "seconds": 54.51
+    },
+    {
+      "preset": "flask",
+      "environment": "docker",
+      "minimal_options": false,
+      "passed": true,
+      "files_sha256": "255c8bdeec8fc485f129be395cec094892870d1d2efb882a6f9a593a30b66569",
+      "seconds": 24.12
+    },
+    {
+      "preset": "fastapi",
+      "environment": "docker",
+      "minimal_options": false,
+      "passed": true,
+      "files_sha256": "0a7a2cf7605d0036c4fe6656cb1c9845472cedcbfd957d4ae77ed947a8bc06dd",
+      "seconds": 21.52
+    },
+    {
+      "preset": "azure",
+      "environment": "docker",
+      "minimal_options": false,
+      "passed": true,
+      "files_sha256": "bed101b9e2ac8cf3e70f4cc16ce1de729d76b5b900db8a1737be328c5ac22a2c",
+      "seconds": 76.25
+    },
+    {
+      "preset": "fullstack-flask",
+      "environment": "docker",
+      "minimal_options": false,
+      "passed": true,
+      "files_sha256": "bc34712329199beed21530638d2e987b7527fcd9c0215a4e8dca078a3127485a",
+      "seconds": 94.8
+    },
+    {
+      "preset": "fullstack-fastapi",
+      "environment": "docker",
+      "minimal_options": false,
+      "passed": true,
+      "files_sha256": "975feaade39fd421a722c6b3fc45de54a809d8ed618ff1ea9dcaab59f4ce64a6",
+      "seconds": 60.17
+    },
+    {
+      "preset": "fullstack-azure",
+      "environment": "docker",
+      "minimal_options": false,
+      "passed": true,
+      "files_sha256": "5ad1cd43c3f123e1baf50cd1f06833ff71a965c5babeff391d5e32cc6259e899",
+      "seconds": 71.76
+    },
+    {
+      "preset": "cli",
+      "environment": "docker",
+      "minimal_options": false,
+      "passed": true,
+      "files_sha256": "a65eea821279e6ef8110eedce043bfbc6c05e9238c86ade1290ef3427382da6c",
+      "seconds": 12.22
+    },
+    {
+      "preset": "python",
+      "environment": "docker",
+      "minimal_options": false,
+      "passed": true,
+      "files_sha256": "d4b23a4ae65d4bbac9ec75d30afd34aaf9dfa92fabfe0d4d004cea12db8a061d",
+      "seconds": 6.32
+    },
+    {
+      "preset": "typescript",
+      "environment": "docker",
+      "minimal_options": false,
+      "passed": true,
+      "files_sha256": "102c0d99c5304c54892b02514cf1428f3ced4dbf08de5caac3f1a8085fb9a5fb",
+      "seconds": 26.16
+    }
+  ],
+  "devcontainer": [
+    {
+      "preset": "web",
+      "environment": "devcontainer",
+      "minimal_options": false,
+      "passed": true,
+      "files_sha256": "ee877e89f8b9004985d92d966b36f4dcc134fbae98e212a81392010246e46d62",
+      "seconds": 40.6
+    },
+    {
+      "preset": "flask",
+      "environment": "devcontainer",
+      "minimal_options": false,
+      "passed": true,
+      "files_sha256": "63a346bc2713b65ef5194e6ac6c9cdd3cc84f6e9da1dd2cc70ea06f3354f43b8",
+      "seconds": 13.56
+    },
+    {
+      "preset": "fastapi",
+      "environment": "devcontainer",
+      "minimal_options": false,
+      "passed": true,
+      "files_sha256": "2af77dff049975977596809b0fb66bd70ceb0eaebc70bf4a2512c98992adef52",
+      "seconds": 16.07
+    },
+    {
+      "preset": "azure",
+      "environment": "devcontainer",
+      "minimal_options": false,
+      "passed": true,
+      "files_sha256": "8ca9cbb46f0ae5661c23029f4366dc9d1e05c642d14dee2e30cd75dd56ee30f6",
+      "seconds": 19.71
+    },
+    {
+      "preset": "fullstack-flask",
+      "environment": "devcontainer",
+      "minimal_options": false,
+      "passed": true,
+      "files_sha256": "6f666bc980fe1708b28e9e93dd6c22f2974e531f9062bb4d2a56b9a8eaedb60c",
+      "seconds": 47.79
+    },
+    {
+      "preset": "fullstack-fastapi",
+      "environment": "devcontainer",
+      "minimal_options": false,
+      "passed": true,
+      "files_sha256": "f7ffd204e0883f30a48664845fff64adeeb3793ef59d5e367a5e75e790f7e382",
+      "seconds": 49.91
+    },
+    {
+      "preset": "fullstack-azure",
+      "environment": "devcontainer",
+      "minimal_options": false,
+      "passed": true,
+      "files_sha256": "8b96a925f7f51d9a52b6ba7eb8164ac6d36aa99bf98940fdd70444df7cc0008c",
+      "seconds": 52.04
+    },
+    {
+      "preset": "cli",
+      "environment": "devcontainer",
+      "minimal_options": false,
+      "passed": true,
+      "files_sha256": "9f016a6ec790ad795a7a8089f911c1f85f4a98bfed338a7bb6cdc8bc8d72ec22",
+      "seconds": 10.95
+    },
+    {
+      "preset": "python",
+      "environment": "devcontainer",
+      "minimal_options": false,
+      "passed": true,
+      "files_sha256": "1604844aa369bffbdcf9a58b4510ea1a524a75d674e3846ec16628d0b654ef34",
+      "seconds": 9.07
+    },
+    {
+      "preset": "typescript",
+      "environment": "devcontainer",
+      "minimal_options": false,
+      "passed": true,
+      "files_sha256": "1e7c23e4c0e063fe158c3e527500f5bb4706627f4e43fe3be4ebbc5c71345f12",
+      "seconds": 17.48
+    }
+  ],
+  "optional_tools_off": [
+    {
+      "preset": "web",
+      "environment": "local",
+      "minimal_options": true,
+      "passed": true,
+      "files_sha256": "5941a7416c02e5ca5b40b0edeaa155f8b89cb5f3849776b08d53836187248746",
+      "seconds": 12.61
+    },
+    {
+      "preset": "flask",
+      "environment": "local",
+      "minimal_options": true,
+      "passed": true,
+      "files_sha256": "ff42d215b8fddc062c16036eedd9136018caac46c618a3f262d23e4126e8954f",
+      "seconds": 6.49
+    },
+    {
+      "preset": "fastapi",
+      "environment": "local",
+      "minimal_options": true,
+      "passed": true,
+      "files_sha256": "65db0447dac42c6ede4b3aecc8f87c1db16d627f0b1ceb87b0deecb0d9faf714",
+      "seconds": 7.59
+    },
+    {
+      "preset": "azure",
+      "environment": "local",
+      "minimal_options": true,
+      "passed": true,
+      "files_sha256": "c7dca3d3235e12c6b4f68a154b1c823bea6438469cf999177bf4452fe253af6c",
+      "seconds": 5.21
+    },
+    {
+      "preset": "fullstack-flask",
+      "environment": "local",
+      "minimal_options": true,
+      "passed": true,
+      "files_sha256": "d91ccfa6437ebbbb0b542bb5cee1d364464f6e576049ae2cdff0cab500ed7740",
+      "seconds": 12.91
+    },
+    {
+      "preset": "fullstack-fastapi",
+      "environment": "local",
+      "minimal_options": true,
+      "passed": true,
+      "files_sha256": "0da5e0710c24caa8d6c8ef3e6caed7a7bf00c0e776ee1accd61afc45c73bada5",
+      "seconds": 13.92
+    },
+    {
+      "preset": "fullstack-azure",
+      "environment": "local",
+      "minimal_options": true,
+      "passed": true,
+      "files_sha256": "1862d8674b5bd9f5a00117647513224563d1ad05b5eba450ef3fc2ff05eb062a",
+      "seconds": 11.31
+    },
+    {
+      "preset": "cli",
+      "environment": "local",
+      "minimal_options": true,
+      "passed": true,
+      "files_sha256": "526f8c9e95c166d558b11ec82166f4c01209035a04e8c8be1bd34eedb0575150",
+      "seconds": 5.01
+    },
+    {
+      "preset": "python",
+      "environment": "local",
+      "minimal_options": true,
+      "passed": true,
+      "files_sha256": "ab0e4e92113946a569f77fd5dbc259c5fc9dcbf84fab2dcd488d0542901ea6b9",
+      "seconds": 3.75
+    },
+    {
+      "preset": "typescript",
+      "environment": "local",
+      "minimal_options": true,
+      "passed": true,
+      "files_sha256": "bd6ad70dab260ceebc511599385af5b3ce38a256991fa9d7bcaef304de880f19",
+      "seconds": 1.64
+    }
+  ],
+  "acceptance": {
+    "passed": true,
+    "fresh_launcher_install": true,
+    "real_interactive_wizard": true,
+    "verified_cli_project": true,
+    "git_and_secret_exclusions": true,
+    "retry_preserves_source": true,
+    "installed_project_command": true,
+    "web_init_ready_with_existing_runtime": true,
+    "original_node_version": "v26.5.0",
+    "parent_shell_runtime_unchanged": true,
+    "wheel_install_and_generation": true,
+    "docker_cli_init_and_check": true,
+    "devcontainer_cli_init_and_check": true
+  },
+  "browser": {
+    "passed": true,
+    "results": [
+      {
+        "width": 320,
+        "colorScheme": "light",
+        "overflow": false,
+        "buttonHeight": 44,
+        "buttonWidth": 203.921875,
+        "color": "rgb(255, 255, 255)",
+        "background": "rgb(25, 118, 210)",
+        "keyboardFocus": true,
+        "button_contrast_ratio": 4.6
+      },
+      {
+        "width": 768,
+        "colorScheme": "light",
+        "overflow": false,
+        "buttonHeight": 44,
+        "buttonWidth": 203.921875,
+        "color": "rgb(255, 255, 255)",
+        "background": "rgb(25, 118, 210)",
+        "keyboardFocus": true,
+        "button_contrast_ratio": 4.6
+      },
+      {
+        "width": 1024,
+        "colorScheme": "light",
+        "overflow": false,
+        "buttonHeight": 44,
+        "buttonWidth": 203.921875,
+        "color": "rgb(255, 255, 255)",
+        "background": "rgb(25, 118, 210)",
+        "keyboardFocus": true,
+        "button_contrast_ratio": 4.6
+      },
+      {
+        "width": 1440,
+        "colorScheme": "light",
+        "overflow": false,
+        "buttonHeight": 44,
+        "buttonWidth": 203.921875,
+        "color": "rgb(255, 255, 255)",
+        "background": "rgb(25, 118, 210)",
+        "keyboardFocus": true,
+        "button_contrast_ratio": 4.6
+      },
+      {
+        "width": 320,
+        "colorScheme": "dark",
+        "overflow": false,
+        "buttonHeight": 44,
+        "buttonWidth": 203.921875,
+        "color": "rgb(255, 255, 255)",
+        "background": "rgb(25, 118, 210)",
+        "keyboardFocus": true,
+        "button_contrast_ratio": 4.6
+      },
+      {
+        "width": 768,
+        "colorScheme": "dark",
+        "overflow": false,
+        "buttonHeight": 44,
+        "buttonWidth": 203.921875,
+        "color": "rgb(255, 255, 255)",
+        "background": "rgb(25, 118, 210)",
+        "keyboardFocus": true,
+        "button_contrast_ratio": 4.6
+      },
+      {
+        "width": 1024,
+        "colorScheme": "dark",
+        "overflow": false,
+        "buttonHeight": 44,
+        "buttonWidth": 203.921875,
+        "color": "rgb(255, 255, 255)",
+        "background": "rgb(25, 118, 210)",
+        "keyboardFocus": true,
+        "button_contrast_ratio": 4.6
+      },
+      {
+        "width": 1440,
+        "colorScheme": "dark",
+        "overflow": false,
+        "buttonHeight": 44,
+        "buttonWidth": 203.921875,
+        "color": "rgb(255, 255, 255)",
+        "background": "rgb(25, 118, 210)",
+        "keyboardFocus": true,
+        "button_contrast_ratio": 4.6
+      }
+    ],
+    "states": [
+      "default",
+      "loading",
+      "connected",
+      "error",
+      "retry"
+    ],
+    "errors": []
+  },
+  "contracts": {
+    "tests": "83",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0",
+    "time": "1.288"
+  },
+  "dependency_audit": {
+    "vulnerabilities": {
+      "info": 0,
+      "low": 0,
+      "moderate": 0,
+      "high": 0,
+      "critical": 0,
+      "total": 0
+    },
+    "dependencies": {
+      "prod": 95,
+      "dev": 420,
+      "optional": 86,
+      "peer": 1,
+      "peerOptional": 0,
+      "total": 572
+    }
+  },
+  "release": "0.1.0",
+  "verified_on": "2026-10-14",
+  "platform_scope": [
+    "macOS Apple Silicon",
+    "Linux ARM64 containers"
+  ],
+  "windows_verified": false,
+  "cli_presentation": {
+    "terminal_keyboard_verified": true,
+    "fresh_python_install_verified": true,
+    "quiet_logging_verified": true,
+    "container_matrices_rerun": false,
+    "windows_keyboard_verified": false
+  }
+}

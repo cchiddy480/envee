@@ -10,10 +10,10 @@ from pathlib import Path
 import tempfile
 import time
 
-from forge_bootstrap.cli import write_files
-from forge_bootstrap.model import Options, PRESETS
-from forge_bootstrap import project_runner as runner
-from forge_bootstrap.templates import render
+from envee_bootstrap.cli import write_files
+from envee_bootstrap.model import Options, PRESETS
+from envee_bootstrap import project_runner as runner
+from envee_bootstrap.templates import render
 
 
 def main():
@@ -23,7 +23,7 @@ def main():
     parser.add_argument("--devcontainer", action="store_true")
     parser.add_argument("--minimal-options", action="store_true")
     parser.add_argument("--node-bin", type=Path, help="Directory containing the Node 22 runtime to test.")
-    parser.add_argument("--output", type=Path, default=Path(".forge/smoke-results.json"))
+    parser.add_argument("--output", type=Path, default=Path(".envee/smoke-results.json"))
     args = parser.parse_args()
     if args.node_bin:
         os.environ["PATH"] = str(args.node_bin) + os.pathsep + os.environ["PATH"]
@@ -32,7 +32,7 @@ def main():
     environment = "devcontainer" if args.devcontainer else "docker" if args.docker else "local"
     for preset in presets:
         started = time.monotonic()
-        with tempfile.TemporaryDirectory(prefix="forge-smoke-") as temporary:
+        with tempfile.TemporaryDirectory(prefix="envee-smoke-") as temporary:
             root = Path(temporary) / "project"
             options = Options(
                 name="smoke-" + secrets.token_hex(4),
@@ -46,12 +46,12 @@ def main():
             files = render(options)
             digest = hashlib.sha256(json.dumps(files, sort_keys=True).encode()).hexdigest()
             write_files(root, files)
-            manifest = json.loads(files["forge.json"])
+            manifest = json.loads(files["envee.json"])
             print(f"\n=== {preset} / {environment} ===", flush=True)
             error = None
             try:
                 if args.devcontainer:
-                    image = "forge-devcontainer-test:" + ("azure" if options.backend == "azure" else "base")
+                    image = "envee-devcontainer-test:" + ("azure" if options.backend == "azure" else "base")
                     runner.run(
                         ["docker", "build", "-t", image, str(root / ".devcontainer")], root, timeout=1800
                     )
@@ -113,7 +113,7 @@ def main():
                         "error": error,
                     }
                 )
-                for log in (root / ".forge").glob("*-startup.log"):
+                for log in (root / ".envee").glob("*-startup.log"):
                     print(log.name, log.read_text()[-8000:])
             finally:
                 args.output.parent.mkdir(parents=True, exist_ok=True)

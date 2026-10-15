@@ -1,0 +1,14 @@
+#!/usr/bin/env sh
+# Local launcher: installs only into this checkout's isolated environment.
+set -eu
+ENVEE_ROOT=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+if [ ! -x "$ENVEE_ROOT/.venv/bin/envee" ]; then
+  ENVEE_PYTHON=${ENVEE_PYTHON:-python3}
+  "$ENVEE_PYTHON" -c 'import sys; sys.exit(0 if sys.version_info >= (3, 12) else "Envee requires Python 3.12 or newer")'
+  "$ENVEE_PYTHON" -m venv "$ENVEE_ROOT/.venv"
+  "$ENVEE_ROOT/.venv/bin/python" -m pip install "$ENVEE_ROOT"
+fi
+if [ "$#" -eq 0 ]; then
+  set -- init
+fi
+exec "$ENVEE_ROOT/.venv/bin/envee" "$@"

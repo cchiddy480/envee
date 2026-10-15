@@ -28,6 +28,8 @@ class Options:
     ci: bool = False
     editor: bool = True
     env: bool = True
+    codegraph: bool = True
+    ponytail: bool = True
     database: str = "none"
 
     def validate(self):

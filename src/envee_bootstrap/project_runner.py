@@ -58,18 +58,27 @@ def executable(name):
     return found
 
 
+def log_directory(root):
+    """Keep existing Forge projects' logs covered by their original ignore rules."""
+    legacy = (root / "forge.json").exists() and not (root / "envee.json").exists()
+    return root / (".forge" if legacy else ".envee")
+
+
 def load(root):
     """Validate the saved manifest before using its paths."""
     try:
-        manifest = json.loads((root / "forge.json").read_text())
+        path = root / "envee.json"
+        if not path.exists():
+            path = root / "forge.json"
+        manifest = json.loads(path.read_text())
     except (OSError, ValueError) as exc:
-        raise RuntimeError("Not a Forge project: forge.json is missing or invalid.") from exc
+        raise RuntimeError("Not an Envee project: envee.json (or legacy forge.json) is missing or invalid.") from exc
     if (
         not isinstance(manifest, dict)
         or manifest.get("schema") != 1
         or not isinstance(manifest.get("components"), list)
     ):
-        raise RuntimeError("Unsupported Forge manifest schema.")
+        raise RuntimeError("Unsupported Envee manifest schema.")
     if not manifest["components"]:
         raise RuntimeError("A project must have at least one component.")
     for c in manifest["components"]:
@@ -88,8 +97,9 @@ def load(root):
         or manifest.get("preset")
         not in PYTHON_KINDS | NODE_KINDS | {"fullstack-flask", "fullstack-fastapi", "fullstack-azure"}
         or any(type(manifest.get(key)) is not bool for key in ["lint", "tests"])
+        or any(type(manifest.get(key, False)) is not bool for key in ["codegraph", "ponytail"])
     ):
-        raise RuntimeError("Invalid project settings in forge.json.")
+        raise RuntimeError("Invalid project settings in envee.json.")
     return manifest
 
 
@@ -308,7 +318,7 @@ def start(root, manifest, quiet=False):
             settings(cwd, c["kind"])
             output = None
             if quiet:
-                logs = root / ".forge"
+                logs = log_directory(root)
                 logs.mkdir(exist_ok=True)
                 output = (logs / f"{c['kind']}-startup.log").open("w")
             try:
@@ -374,7 +384,7 @@ def probe(urls, processes=(), timeout=90):
     pending = list(urls)
     while pending and time.monotonic() < deadline:
         if any(p.poll() is not None for p in processes):
-            raise RuntimeError("A development server exited during startup. See .forge/*-startup.log.")
+            raise RuntimeError("A development server exited during startup. See the project's startup logs in .envee/ (legacy .forge/).")
         for url, is_json in pending[:]:
             try:
                 with urlopen(url, timeout=2) as response:
@@ -407,7 +417,7 @@ def smoke(root, manifest, local):
                         / ("Scripts" if os.name == "nt" else "bin")
                         / (manifest["name"] + (".exe" if os.name == "nt" else ""))
                     )
-                    run([str(command), "--name", "Forge"], cwd, timeout=30)
+                    run([str(command), "--name", "Envee"], cwd, timeout=30)
             else:
                 run(["docker", "compose", "run", "--rm", service_name(manifest, c)], root, timeout=30)
                 if c["kind"] == "cli":
@@ -421,7 +431,7 @@ def smoke(root, manifest, local):
                             manifest["name"],
                             service_name(manifest, c),
                             "--name",
-                            "Forge",
+                            "Envee",
                         ],
                         root,
                         timeout=30,
@@ -452,8 +462,8 @@ def smoke(root, manifest, local):
             probe(urls, timeout=120)
         except (RuntimeError, OSError):
             logs = capture(["docker", "compose", "logs", "--no-color"], root)
-            (root / ".forge").mkdir(exist_ok=True)
-            (root / ".forge/compose-startup.log").write_text(logs)
+            log_directory(root).mkdir(exist_ok=True)
+            (log_directory(root) / "compose-startup.log").write_text(logs)
             print(logs[-8000:], flush=True)
             raise
         finally:
@@ -463,7 +473,7 @@ def smoke(root, manifest, local):
 
 def devcontainer(root, manifest, action, skip_runtime, build=False):
     """Validate the actual VS Code image and setup command in a clean container."""
-    image = "forge-devcontainer:" + manifest["name"]
+    image = "envee-devcontainer:" + manifest["name"]
     if build:
         run(["docker", "build", "-t", image, str(root / ".devcontainer")], root, timeout=1800)
     args = [
@@ -487,7 +497,7 @@ def devcontainer(root, manifest, action, skip_runtime, build=False):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Install, check or run this Forge project.")
+    parser = argparse.ArgumentParser(description="Install, check or run this Envee project.")
     parser.add_argument("action", choices=["setup", "check", "dev"])
     parser.add_argument("--local", action="store_true", help="Use local tools instead of Docker.")
     parser.add_argument("--skip-runtime", action="store_true", help="Skip live startup (useful in CI).")

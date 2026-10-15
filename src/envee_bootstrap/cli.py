@@ -17,6 +17,7 @@ from rich.text import Text
 from . import __version__
 from .model import Options, PRESETS
 from . import project_runner as runner
+from . import agent_tools
 from .templates import render
 
 console = Console(highlight=False)
@@ -56,7 +57,7 @@ def choose(question, choices, default=1):
 @contextmanager
 def progress(root, action):
     """Keep terminal output readable while preserving full command diagnostics."""
-    logs = root / ".forge"
+    logs = runner.log_directory(root)
     logs.mkdir(exist_ok=True)
     path = logs / f"{action}.log"
     original_run, original_output = runner.run, runner.OUTPUT_STREAM
@@ -66,6 +67,8 @@ def progress(root, action):
             def run(args, cwd, timeout=900):
                 command = " ".join(map(str, args))
                 label = (
+                    "Indexing project with CodeGraph" if "codegraph" in command and
+                    any(action in args for action in ["init", "sync"]) else
                     "Creating Python environment" if "venv" in args else
                     "Installing dependencies" if "install" in args or "ci" in args else
                     "Building project" if "build" in args else
@@ -123,7 +126,7 @@ def wizard_preset():
 @click.group()
 @click.version_option(__version__)
 def main():
-    """FORGE — your development environment, ready."""
+    """ENVEE — your development environment, ready."""
 
 
 @main.command("presets")
@@ -138,29 +141,41 @@ def list_presets():
 @click.option("--name", help="Project name: lowercase words separated by hyphens.")
 @click.option("--preset", type=click.Choice(list(PRESETS)))
 @click.option("--environment", type=click.Choice(["local", "docker", "devcontainer"]))
+@click.option("--advanced/--default", "advanced", default=None,
+              help="Choose individual tools, or use the recommended development tools.")
 @click.option("--git/--no-git", default=None)
 @click.option("--lint/--no-lint", default=None)
 @click.option("--tests/--no-tests", default=None)
 @click.option("--ci/--no-ci", default=None)
 @click.option("--editor/--no-editor", default=None)
 @click.option("--env/--no-env", default=None)
+@click.option("--codegraph/--no-codegraph", default=None, help="Install and initialise CodeGraph on the host.")
+@click.option("--ponytail/--no-ponytail", default=None, help="Include the Ponytail core coding skill.")
 @click.option("--database", type=click.Choice(["none", "sqlite"]))
 @click.option("--install/--no-install", default=True, help="Install and verify by default.")
 @click.option("--yes", is_flag=True, help="Use defaults for any unanswered choices.")
 @click.option("--dry-run", is_flag=True, help="Preview files and choices without writing or installing.")
 def init(
-    directory, name, preset, environment, git, lint, tests, ci, editor, env, database, install, yes, dry_run
+    directory, name, preset, environment, advanced, git, lint, tests, ci, editor, env,
+    codegraph, ponytail, database, install, yes, dry_run
 ):
     """Turn an empty DIRECTORY into a ready-to-code project."""
     target = directory.absolute()
     if target.is_symlink():
         raise click.ClickException("Use a real directory, not a symbolic link.")
     if target.exists() and (not target.is_dir() or any(target.iterdir())):
-        raise click.ClickException("The destination must be empty. Forge will not overwrite existing files.")
+        raise click.ClickException("The destination must be empty. Envee will not overwrite existing files.")
     interactive = not yes
-    console.print(Panel("[bold cyan]FORGE[/bold cyan]\nYour development environment, ready.", border_style="cyan"))
+    console.print(Panel("[bold cyan]ENVEE[/bold cyan]\nYour development environment, ready.", border_style="cyan"))
+    if advanced is None:
+        advanced = interactive and choose(
+            "How would you like to set up?",
+            [("default", "Default setup — recommended tools, fewer questions"),
+             ("advanced", "Advanced setup — choose individual tools and database")],
+        ) == "advanced"
+    stages = 4 if advanced else 3
     if interactive:
-        console.print("1 / 4 · Choose your project", style="bold cyan")
+        console.print(f"1 / {stages} · Choose your project", style="bold cyan")
     default_name = re.sub(r"[^a-z0-9]+", "-", target.name.lower()).strip("-")
     if not default_name or not default_name[0].isalpha():
         default_name = "my-project"
@@ -170,7 +185,7 @@ def init(
         preset = wizard_preset() if interactive else "python"
     if environment is None:
         if interactive:
-            console.print("\n2 / 4 · Choose where it runs", style="bold cyan")
+            console.print(f"\n2 / {stages} · Choose where it runs", style="bold cyan")
         environment = (
             choose(
                 "Where should it run?",
@@ -187,9 +202,11 @@ def init(
         "ci": (ci, False, "Add GitHub Actions?"),
         "editor": (editor, True, "Add VS Code configuration?"),
         "env": (env, True, "Add environment-file examples?"),
+        "codegraph": (codegraph, True, "Add CodeGraph indexing and Codex integration?"),
+        "ponytail": (ponytail, True, "Add the Ponytail core coding skill?"),
     }
     values = {}
-    if interactive:
+    if interactive and advanced:
         console.print("\n3 / 4 · Choose your tools", style="bold cyan")
         console.print("Press Enter to accept each recommended default. [Y/n] means yes; [y/N] means no.",
                       style="dim", markup=False)
@@ -198,13 +215,14 @@ def init(
             value
             if value is not None
             else click.confirm(question, default=default)
-            if interactive
+            if interactive and advanced
             else default
         )
     if database is None:
         database = (
             "sqlite"
             if interactive
+            and advanced
             and preset.removeprefix("fullstack-") in {"flask", "fastapi"}
             and click.confirm("Add a local SQLite database?", default=False)
             else "none"
@@ -213,9 +231,10 @@ def init(
     try:
         options.validate()
         files = render(options)
-        manifest = json.loads(files["forge.json"])
+        manifest = json.loads(files["envee.json"])
         table = Table(show_header=False, box=None)
         for key, value in [
+            ("Setup", "Advanced" if advanced else "Default"),
             ("Project", name),
             ("Preset", PRESETS[preset]),
             ("Environment", environment),
@@ -223,10 +242,13 @@ def init(
             ("Files", str(len(files))),
         ]:
             table.add_row(key, value)
-        enabled = [key for key, enabled in values.items() if enabled]
+        labels = {"git": "Git", "lint": "Formatter / linter", "tests": "Tests",
+                  "ci": "GitHub Actions", "editor": "VS Code", "env": "Environment examples",
+                  "codegraph": "CodeGraph", "ponytail": "Ponytail"}
+        enabled = [labels[key] for key, enabled in values.items() if enabled]
         table.add_row("Tools", ", ".join(enabled) or "None")
         table.add_row("Database", database)
-        console.print(Panel(table, title="4 / 4 · Your project", border_style="cyan"))
+        console.print(Panel(table, title=f"{stages} / {stages} · Your project", border_style="cyan"))
         if dry_run:
             for path in sorted(files):
                 console.print(f"  {path}", markup=False)
@@ -243,6 +265,7 @@ def init(
         if install:
             with progress(target, "setup"):
                 runner.setup(target, manifest, environment == "local")
+                agent_tools.setup(target, manifest)
             console.print("\n✓ YOUR ENVIRONMENT IS READY", style="bold green")
         else:
             console.print(
@@ -251,7 +274,8 @@ def init(
         console.print(f"\nOpen: {target}", markup=False)
         console.print(f"First: cd {shlex.quote(str(target))}", markup=False)
         if not install:
-            console.print("Next: python3 scripts/project.py setup")
+            console.print("Next: envee setup ." if options.codegraph or options.ponytail
+                          else "Next: python3 scripts/project.py setup")
         elif environment == "devcontainer":
             console.print("Next: open in VS Code → Dev Containers: Reopen in Container")
         elif environment == "docker":
@@ -260,8 +284,8 @@ def init(
             console.print("Start: python3 scripts/project.py dev")
     except (ValueError, RuntimeError, OSError) as exc:
         suffix = (
-            f"\nYour files are preserved. Retry with: forge setup {shlex.quote(str(target))}"
-            if (target / "forge.json").exists()
+            f"\nYour files are preserved. Retry with: envee setup {shlex.quote(str(target))}"
+            if (target / "envee.json").exists()
             else "\nNo setup was completed."
         )
         raise click.ClickException(str(exc) + suffix) from exc
@@ -293,6 +317,7 @@ def existing_project(directory, action, local, skip_runtime):
         with progress(root, action):
             if action == "setup":
                 runner.setup(root, manifest, use_local, skip_runtime)
+                agent_tools.setup(root, manifest)
             else:
                 runner.check(root, manifest, use_local, skip_runtime)
     except (RuntimeError, OSError, ValueError, KeyError) as exc:
@@ -324,7 +349,7 @@ def doctor(preset, environment):
     """Check prerequisites without installing or creating files."""
     options = Options(name="doctor", preset=preset, environment=environment)
     try:
-        manifest = json.loads(render(options)["forge.json"])
+        manifest = json.loads(render(options)["envee.json"])
         runner.preflight(manifest, environment == "local")
         console.print(f"✓ Prerequisites available for {preset} / {environment}", style="green")
         console.print(f"Python {sys.version.split()[0]}")

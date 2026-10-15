@@ -1,4 +1,4 @@
-include forge forge.ps1 VALIDATION.md HOMEBREW.md
+include envee envee.ps1 VALIDATION.md HOMEBREW.md
 recursive-include scripts *.py
 recursive-include .github *.yml
 recursive-include validation *.json

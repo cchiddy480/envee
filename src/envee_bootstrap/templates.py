@@ -5,7 +5,9 @@ import json
 from pathlib import Path
 from textwrap import dedent
 
+from . import __version__
 from .model import Options
+from .agent_tools import IGNORE_PATTERNS
 
 
 def text(value):
@@ -556,17 +558,17 @@ def render(o: Options):
     if o.has_python:
         path = "backend" if o.fullstack else "."
         components.append({"path": path, "kind": o.backend})
-        f.update({str(Path(path) / k): v for k, v in python_files(o).items()})
+        f.update({(Path(path) / k).as_posix(): v for k, v in python_files(o).items()})
     if o.backend in {"azure", "typescript"}:
         path = "backend" if o.fullstack else "."
         components.append({"path": path, "kind": o.backend})
-        f.update({str(Path(path) / k): v for k, v in node_files(o, o.backend).items()})
+        f.update({(Path(path) / k).as_posix(): v for k, v in node_files(o, o.backend).items()})
     if o.has_web:
         path = "frontend" if o.fullstack else "."
         components.append({"path": path, "kind": "web"})
-        f.update({str(Path(path) / k): v for k, v in node_files(o, "web").items()})
-    manifest = {"schema": 1, "forge_version": "0.1.0", **asdict(o), "components": components}
-    f["forge.json"] = js(manifest)
+        f.update({(Path(path) / k).as_posix(): v for k, v in node_files(o, "web").items()})
+    manifest = {"schema": 1, "envee_version": __version__, **asdict(o), "components": components}
+    f["envee.json"] = js(manifest)
     f["scripts/project.py"] = Path(__file__).with_name("project_runner.py").read_text()
     f[".gitignore"] = text("""
         .venv/
@@ -584,9 +586,24 @@ def render(o: Options):
         !.env.example
         local.settings.json
         data/
-        .forge/
+        .envee/
         .DS_Store
     """)
+    if o.codegraph or o.ponytail:
+        f[".gitignore"] += "\n# Local agent tools\n" + "\n".join(IGNORE_PATTERNS) + "\n"
+        guidance = "# Local development tools\n\n"
+        if o.codegraph:
+            guidance += ("## CodeGraph\n\nUse CodeGraph before searching or reading unfamiliar code. "
+                         "Use the codegraph_explore MCP tool or `codegraph explore` to find symbols "
+                         "and call paths. The local `.codegraph/` index is excluded from Git.\n\n")
+        if o.ponytail:
+            assets = Path(__file__).parent / "assets/ponytail"
+            for name in ["SKILL.md", "LICENSE", "SOURCE.md"]:
+                f[".agents/skills/ponytail/" + name] = (assets / name).read_text(encoding="utf-8")
+            guidance += ("## Ponytail\n\nFor coding work, read `.agents/skills/ponytail/SKILL.md` "
+                         "and apply its full mode: the smallest complete solution, with validation "
+                         "and necessary checks. Keep these instructions and skills local.\n")
+        f["AGENTS.md"] = guidance
     f[".editorconfig"] = text("""
         root = true
         [*]
@@ -600,7 +617,7 @@ def render(o: Options):
     """)
     for c in components:
         if o.env:
-            f[str(Path(c["path"]) / ".env.example")] = (
+            f[(Path(c["path"]) / ".env.example").as_posix()] = (
                 "DATABASE_URL=sqlite:///data/app.db\n"
                 if o.database == "sqlite" and c["kind"] in {"flask", "fastapi"}
                 else "# Add local settings here. Keep credentials out of Git.\n"
@@ -707,9 +724,9 @@ def container_files(f, o, components):
         }.get(kind)
         if command:
             dockerfile += "CMD " + json.dumps(command) + "\n"
-        f[str(Path(path) / "Dockerfile")] = dockerfile
-        f[str(Path(path) / ".dockerignore")] = (
-            ".venv\nnode_modules\ndist\n.git\n.env\n.env.*\nlocal.settings.json\n.forge\ndata\n"
+        f[(Path(path) / "Dockerfile").as_posix()] = dockerfile
+        f[(Path(path) / ".dockerignore").as_posix()] = (
+            ".venv\nnode_modules\ndist\n.git\n.env\n.env.*\nlocal.settings.json\n.envee\ndata\n"
         )
         service = "frontend" if kind == "web" and o.fullstack else "backend" if o.fullstack else "app"
         services[service] = {"build": {"context": path}, "init": True}
@@ -724,7 +741,7 @@ def container_files(f, o, components):
             services[service]["ports"] = ["127.0.0.1:" + ("7071:7071" if kind == "azure" else "8000:8000")]
         if o.database == "sqlite" and python:
             services[service]["volumes"] = ["database:/workspace/data"]
-    compose = {"name": "forge-" + o.name, "services": services}
+    compose = {"name": "envee-" + o.name, "services": services}
     if o.database == "sqlite":
         compose["volumes"] = {"database": {}}
     # JSON is valid YAML and avoids another parser dependency.
@@ -778,7 +795,7 @@ def readme(o, components):
     return text(f"""
         # {o.name}
 
-        Created with Forge · preset `{o.preset}` · environment `{o.environment}`.
+        Created with Envee · preset `{o.preset}` · environment `{o.environment}`.
 
         ## Start developing
 

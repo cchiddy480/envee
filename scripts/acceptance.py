@@ -40,30 +40,30 @@ def main():
         raise RuntimeError(
             "The shell-launcher acceptance test runs on macOS/Linux; use the CI contract suite on Windows."
         )
-    with tempfile.TemporaryDirectory(prefix="forge-acceptance-") as temporary:
+    with tempfile.TemporaryDirectory(prefix="envee-acceptance-") as temporary:
         temporary = Path(temporary)
-        checkout = temporary / "forge"
+        checkout = temporary / "envee"
         checkout.mkdir()
-        for name in ["pyproject.toml", "README.md", "LICENSE", "forge", "forge.ps1", "MANIFEST.in"]:
+        for name in ["pyproject.toml", "README.md", "LICENSE", "envee", "envee.ps1", "MANIFEST.in", "HOMEBREW.md"]:
             shutil.copy2(root / name, checkout / name)
         shutil.copytree(
-            root / "src/forge_bootstrap",
-            checkout / "src/forge_bootstrap",
+            root / "src/envee_bootstrap",
+            checkout / "src/envee_bootstrap",
             ignore=shutil.ignore_patterns("__pycache__"),
         )
         environment = os.environ.copy()
-        environment["FORGE_PYTHON"] = sys.executable
-        assert "0.1.0" in command(["bash", str(checkout / "forge"), "--version"], checkout, environment)
+        environment["ENVEE_PYTHON"] = sys.executable
+        assert "0.2.0" in command(["bash", str(checkout / "envee"), "--version"], checkout, environment)
         project = temporary / "new-project"
         project.mkdir()
         output = command(
-            ["bash", str(checkout / "forge")],
+            ["bash", str(checkout / "envee")],
             project,
             environment,
-            "acceptance-tool\n4\n1\ny\ny\ny\ny\ny\ny\n",
+            "2\nacceptance-tool\n4\n1\ny\ny\ny\ny\ny\ny\ny\ny\n",
         )
         assert "YOUR ENVIRONMENT IS READY" in output
-        manifest = json.loads((project / "forge.json").read_text())
+        manifest = json.loads((project / "envee.json").read_text())
         assert manifest["preset"] == "cli" and manifest["ci"]
         assert command(["git", "symbolic-ref", "--short", "HEAD"], project).strip() == "main"
         (project / ".env").write_text("PLACEHOLDER=true\n")
@@ -71,25 +71,25 @@ def main():
         status = command(["git", "status", "--porcelain", "--untracked-files=all"], project)
         assert "local.settings.json" not in status and " .env\n" not in status and ".venv/" not in status
         source = (project / "app/main.py").read_bytes()
-        command([str(checkout / ".venv/bin/forge"), "setup", str(project)], project)
+        command([str(checkout / ".venv/bin/envee"), "setup", str(project)], project)
         assert (project / "app/main.py").read_bytes() == source
         assert "Hello, team!" in command(
             [str(project / ".venv/bin/acceptance-tool"), "--name", "team"], project
         )
         active_node = command(["node", "--version"], temporary).strip()
         web_project = temporary / "web-project"
-        output = command([str(checkout / ".venv/bin/forge"), "init", str(web_project), "--name", "acceptance-web",
+        output = command([str(checkout / ".venv/bin/envee"), "init", str(web_project), "--name", "acceptance-web",
                           "--preset", "web", "--yes", "--no-git"], temporary)
         assert "YOUR ENVIRONMENT IS READY" in output
         assert command(["node", "--version"], temporary).strip() == active_node
-        wheel = next((root / "dist").glob("*.whl"))
+        wheel = root / "dist/envee-0.2.0-py3-none-any.whl"
         wheel_env = temporary / "wheel-env"
         command([sys.executable, "-m", "venv", str(wheel_env)], temporary)
         command([str(wheel_env / "bin/python"), "-m", "pip", "install", str(wheel)], temporary)
         preview = temporary / "wheel-preview"
         command(
             [
-                str(wheel_env / "bin/forge"),
+                str(wheel_env / "bin/envee"),
                 "init",
                 str(preview),
                 "--yes",
@@ -103,7 +103,7 @@ def main():
         # Generation from the installed wheel proves packaged template resources are present.
         command(
             [
-                str(wheel_env / "bin/forge"),
+                str(wheel_env / "bin/envee"),
                 "init",
                 str(preview),
                 "--yes",
@@ -134,7 +134,7 @@ def main():
                 name = "acceptance-" + secrets.token_hex(4)
                 output = command(
                     [
-                        str(checkout / ".venv/bin/forge"),
+                        str(checkout / ".venv/bin/envee"),
                         "init",
                         str(target),
                         "--name",
@@ -149,10 +149,10 @@ def main():
                     temporary,
                 )
                 assert "YOUR ENVIRONMENT IS READY" in output
-                command([str(checkout / ".venv/bin/forge"), "check", str(target)], temporary)
+                command([str(checkout / ".venv/bin/envee"), "check", str(target)], temporary)
                 result[mode + "_cli_init_and_check"] = True
-        (root / ".forge").mkdir(exist_ok=True)
-        (root / ".forge/acceptance.json").write_text(json.dumps(result, indent=2) + "\n")
+        (root / ".envee").mkdir(exist_ok=True)
+        (root / ".envee/acceptance.json").write_text(json.dumps(result, indent=2) + "\n")
         print(json.dumps(result, indent=2))
 
 

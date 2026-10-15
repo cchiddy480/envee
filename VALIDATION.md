@@ -1,4 +1,24 @@
-# Forge 0.1.0 validation
+# Envee 0.2.0 validation
+
+Verified on 15 October 2026.
+
+- 112 passing contract tests, including the new name, new manifest, old Forge manifest
+  compatibility, both setup tracks, agent-tool safety and generated-file exclusions.
+- All ten presets passed fresh local installation, build, selected lint/tests, live
+  startup and a repeated setup under the Envee name on macOS Apple Silicon.
+- Fresh source launcher installation, the real advanced wizard, safe retries, Git
+  exclusions and installation of the renamed wheel all passed.
+- The renamed wheel contains the `envee` entry point, renamed modules and Ponytail assets.
+- CodeGraph download verification and project MCP handshake passed during development.
+
+Release-specific evidence is in [validation/envee-0.2.0.json](validation/envee-0.2.0.json).
+Docker/Dev Container matrices and browser checks below are historical baseline evidence;
+they were not repeated for this rename. Windows remains subject to hosted CI verification.
+
+## Historical baseline: Forge 0.1.0
+
+The following records describe the original Forge release verified on 14 October 2026.
+They are retained as baseline evidence, rather than presented as reruns of Envee 0.2.0.
 
 Verified on 14 October 2026. Detailed results are in [validation/results.json](validation/results.json).
 

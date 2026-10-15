@@ -1,4 +1,4 @@
-name: Verify Forge
+name: Verify Envee
 on: [push, pull_request]
 permissions:
   contents: read

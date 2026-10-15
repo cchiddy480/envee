@@ -1,0 +1,105 @@
+{
+  "release": "0.2.0",
+  "brand": "Envee",
+  "verified_on": "2026-10-15",
+  "contract_tests": 112,
+  "local_starters": [
+    {
+      "preset": "web",
+      "environment": "local",
+      "minimal_options": false,
+      "passed": true,
+      "files_sha256": "9b4170e595d65b0670b4b6860f9e05d4a185b73ea585ac30ddf7406dc8ef4d85",
+      "seconds": 27.49
+    },
+    {
+      "preset": "flask",
+      "environment": "local",
+      "minimal_options": false,
+      "passed": true,
+      "files_sha256": "f31d652866948166645241a08ae7097345fb411404fa49429a5614fd8594e6b9",
+      "seconds": 13.6
+    },
+    {
+      "preset": "fastapi",
+      "environment": "local",
+      "minimal_options": false,
+      "passed": true,
+      "files_sha256": "325d6b581e44c72540c14658e10a7e308b6b966f20d42cb3e5fafc3bcb361657",
+      "seconds": 14.56
+    },
+    {
+      "preset": "azure",
+      "environment": "local",
+      "minimal_options": false,
+      "passed": true,
+      "files_sha256": "318605bd95dffa8d14854bb54ffef450ff7cb6b1c32c35264fe558058c72693b",
+      "seconds": 11.74
+    },
+    {
+      "preset": "fullstack-flask",
+      "environment": "local",
+      "minimal_options": false,
+      "passed": true,
+      "files_sha256": "c956e4be230669b333260f10e2c8c21ac3a13f8c7a90e89ab4f015bc9059ef0d",
+      "seconds": 31.49
+    },
+    {
+      "preset": "fullstack-fastapi",
+      "environment": "local",
+      "minimal_options": false,
+      "passed": true,
+      "files_sha256": "48f5b8e888e41af2f1fd15fcb153c815cb6748229473081997158c2d1b730552",
+      "seconds": 36.02
+    },
+    {
+      "preset": "fullstack-azure",
+      "environment": "local",
+      "minimal_options": false,
+      "passed": true,
+      "files_sha256": "0578ccb38c1b3829beac2a449911c7eb7fc33fa70cf36e5ac9137169e55b15fa",
+      "seconds": 26.91
+    },
+    {
+      "preset": "cli",
+      "environment": "local",
+      "minimal_options": false,
+      "passed": true,
+      "files_sha256": "c55c7c1e8cb1cf04d5d072b040ebef2f56a3f477a81728bd0a6fd53494ef2dbe",
+      "seconds": 8.49
+    },
+    {
+      "preset": "python",
+      "environment": "local",
+      "minimal_options": false,
+      "passed": true,
+      "files_sha256": "d1fadd69f93f2cb1fb2897495c00da439ba3077eb6063a6e049b0bb3e4fd894c",
+      "seconds": 7.0
+    },
+    {
+      "preset": "typescript",
+      "environment": "local",
+      "minimal_options": false,
+      "passed": true,
+      "files_sha256": "e91a85a5bccdd507e2fd79acac452f0d24c796d8299e8041f1be22bc35dd77a9",
+      "seconds": 8.7
+    }
+  ],
+  "legacy_manifest_compatible": true,
+  "wheel_entrypoint_verified": true,
+  "platform": "macOS Apple Silicon",
+  "container_matrices_rerun": false,
+  "acceptance": {
+    "passed": true,
+    "fresh_launcher_install": true,
+    "real_interactive_wizard": true,
+    "verified_cli_project": true,
+    "git_and_secret_exclusions": true,
+    "retry_preserves_source": true,
+    "installed_project_command": true,
+    "web_init_ready_with_existing_runtime": true,
+    "original_node_version": "v26.5.0",
+    "parent_shell_runtime_unchanged": true,
+    "wheel_install_and_generation": true
+  }
+}

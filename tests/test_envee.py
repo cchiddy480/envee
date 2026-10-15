@@ -13,11 +13,40 @@ import sys
 from click.testing import CliRunner
 import pytest
 
-from forge_bootstrap.cli import main, write_files
-from forge_bootstrap import cli
-from forge_bootstrap.model import Options, PRESETS
-from forge_bootstrap import project_runner as runner
-from forge_bootstrap.templates import render
+from envee_bootstrap.cli import main, write_files
+from envee_bootstrap import cli
+from envee_bootstrap.model import Options, PRESETS
+from envee_bootstrap import project_runner as runner
+from envee_bootstrap.templates import render
+
+
+def test_rename_preserves_existing_projects(tmp_path, monkeypatch):
+    files = render(Options(name="legacy", preset="python", codegraph=False, ponytail=False))
+    files["forge.json"] = files.pop("envee.json")
+    write_files(tmp_path, files)
+    original = (tmp_path / "app/main.py").read_bytes()
+    monkeypatch.setattr(runner, "check", lambda *args: None)
+    result = CliRunner().invoke(main, ["check", str(tmp_path)])
+    assert result.exit_code == 0, result.output
+    assert (tmp_path / ".forge/check.log").exists()
+    assert not (tmp_path / "envee.json").exists()
+    assert (tmp_path / "app/main.py").read_bytes() == original
+
+
+def test_new_manifest_takes_precedence(tmp_path):
+    files = render(Options(name="new-project", preset="python"))
+    (tmp_path / "envee.json").write_text(files["envee.json"])
+    (tmp_path / "forge.json").write_text("invalid legacy file")
+    assert runner.load(tmp_path)["name"] == "new-project"
+    assert runner.log_directory(tmp_path) == tmp_path / ".envee"
+
+
+def test_new_brand_and_version(tmp_path):
+    result = CliRunner().invoke(main, ["init", str(tmp_path / "brand"), "--yes", "--no-git", "--no-install"])
+    assert result.exit_code == 0, result.output
+    assert "ENVEE" in result.output and "FORGE" not in result.output
+    manifest = json.loads((tmp_path / "brand/envee.json").read_text())
+    assert manifest["envee_version"] == "0.2.0"
 
 
 @pytest.mark.parametrize("keys,expected", [(["\x1b[B", "\r"], "b"), (["\x1b[A", "\r"], "c"), (["2", "\r"], "b")])
@@ -39,7 +68,7 @@ def test_progress_logs_and_restores_runner(tmp_path, capsys, fails):
             if fails:
                 raise RuntimeError("failed")
     output = capsys.readouterr().out
-    assert "installer details" in (tmp_path / ".forge/setup.log").read_text()
+    assert "installer details" in (tmp_path / ".envee/setup.log").read_text()
     assert ("installer details" in output) is fails
     assert runner.run is original
     assert runner.OUTPUT_STREAM is None
@@ -57,7 +86,8 @@ def test_all_templates_parse(preset, environment):
             tomllib.loads(content)
         elif name.endswith(".py"):
             ast.parse(content, filename=name)
-    manifest = json.loads(files["forge.json"])
+    manifest = json.loads(files["envee.json"])
+    assert all("\\" not in name for name in files)
     assert len(manifest["components"]) == (2 if preset.startswith("fullstack-") else 1)
     assert "scripts/project.py" in files
     assert ("compose.yaml" in files) == (environment != "local")
@@ -107,7 +137,7 @@ def test_existing_files_preserved(tmp_path):
     result = CliRunner().invoke(main, ["init", str(tmp_path), "--yes", "--no-install"])
     assert result.exit_code != 0
     assert original.read_text() == "keep this"
-    assert not (tmp_path / "forge.json").exists()
+    assert not (tmp_path / "envee.json").exists()
 
 
 def test_hidden_files_also_protected(tmp_path):
@@ -142,13 +172,52 @@ def test_wizard_fullstack(tmp_path):
     result = CliRunner().invoke(
         main,
         ["init", str(tmp_path / "wizard"), "--no-install", "--no-git"],
-        input="my-project\n3\n2\n1\ny\ny\nn\ny\ny\ny\n",
+        input="2\nmy-project\n3\n2\n1\ny\ny\nn\ny\ny\ny\ny\ny\n",
     )
     assert result.exit_code == 0, result.output
-    manifest = json.loads((tmp_path / "wizard/forge.json").read_text())
+    manifest = json.loads((tmp_path / "wizard/envee.json").read_text())
     assert manifest["preset"] == "fullstack-fastapi"
     assert manifest["database"] == "sqlite"
     assert "not been verified" in result.output
+
+
+def test_default_wizard_skips_tool_questions(tmp_path):
+    result = CliRunner().invoke(
+        main, ["init", str(tmp_path / "default"), "--no-install", "--no-git"],
+        input="\nmy-project\n3\n2\n1\n",
+    )
+    assert result.exit_code == 0, result.output
+    manifest = json.loads((tmp_path / "default/envee.json").read_text())
+    assert manifest["preset"] == "fullstack-fastapi"
+    assert all(manifest[key] for key in ["lint", "tests", "editor", "env"])
+    assert not manifest["git"] and not manifest["ci"]
+    assert manifest["database"] == "none"
+    assert "Add tests?" not in result.output
+    assert "Add a local SQLite" not in result.output
+    assert "3 / 3" in result.output
+
+
+@pytest.mark.parametrize("preset", PRESETS)
+def test_default_route_honours_flags(tmp_path, preset):
+    result = CliRunner().invoke(
+        main, ["init", str(tmp_path / preset), "--default", "--name", "test-app",
+               "--preset", preset, "--environment", "local", "--ci", "--no-lint",
+               "--no-git", "--no-install"],
+    )
+    assert result.exit_code == 0, result.output
+    manifest = json.loads((tmp_path / preset / "envee.json").read_text())
+    assert manifest["ci"] and manifest["tests"]
+    assert not manifest["lint"] and not manifest["git"]
+    assert "How would you like" not in result.output and "Add tests?" not in result.output
+
+
+def test_advanced_flag_with_yes_is_noninteractive(tmp_path):
+    result = CliRunner().invoke(
+        main, ["init", str(tmp_path / "advanced"), "--advanced", "--yes", "--no-git", "--no-install"],
+    )
+    assert result.exit_code == 0, result.output
+    assert "How would you like" not in result.output and "Add tests?" not in result.output
+    assert "Advanced" in result.output
 
 
 def test_invalid_database_no_writes(tmp_path):
@@ -177,8 +246,8 @@ def test_failed_install_retains_retryable_project(tmp_path, monkeypatch):
     monkeypatch.setattr(runner, "setup", lambda *args: (_ for _ in ()).throw(RuntimeError("Download failed")))
     result = CliRunner().invoke(main, ["init", str(target), "--yes", "--no-git"])
     assert result.exit_code != 0
-    assert (target / "forge.json").exists()
-    assert "forge setup" in result.output
+    assert (target / "envee.json").exists()
+    assert "envee setup" in result.output
     assert "ENVIRONMENT IS READY" not in result.output
 
 
@@ -192,7 +261,7 @@ def test_settings_not_overwritten(tmp_path):
 
 @pytest.mark.parametrize("path", ["../outside", "/tmp", "backend/../../outside"])
 def test_untrusted_manifest_paths_rejected(tmp_path, path):
-    (tmp_path / "forge.json").write_text(
+    (tmp_path / "envee.json").write_text(
         json.dumps({"schema": 1, "components": [{"path": path, "kind": "python"}]})
     )
     with pytest.raises(RuntimeError, match="path"):
@@ -201,7 +270,7 @@ def test_untrusted_manifest_paths_rejected(tmp_path, path):
 
 def test_manifest_symlink_escape_rejected(tmp_path):
     (tmp_path / "backend").symlink_to(tmp_path.parent, target_is_directory=True)
-    (tmp_path / "forge.json").write_text(
+    (tmp_path / "envee.json").write_text(
         json.dumps({"schema": 1, "components": [{"path": "backend", "kind": "python"}]})
     )
     with pytest.raises(RuntimeError, match="escapes"):
@@ -212,7 +281,7 @@ def test_manifest_symlink_escape_rejected(tmp_path):
     "manifest", [[], None, {"schema": 1, "components": [{"path": ".", "kind": "python"}]}]
 )
 def test_malformed_manifest_fails_clearly(tmp_path, manifest):
-    (tmp_path / "forge.json").write_text(json.dumps(manifest))
+    (tmp_path / "envee.json").write_text(json.dumps(manifest))
     with pytest.raises(RuntimeError, match="schema|settings"):
         runner.load(tmp_path)
 
@@ -226,7 +295,7 @@ def test_command_failure_reports_exit_code(tmp_path):
 
 def test_missing_command_reports_remediation(tmp_path):
     with pytest.raises(RuntimeError, match="not found"):
-        runner.run(["forge-nonexistent-command"], tmp_path)
+        runner.run(["envee-nonexistent-command"], tmp_path)
 
 
 def test_command_timeout_stops_process(tmp_path):
@@ -330,4 +399,4 @@ def test_manifest_and_readme_port_agree():
     files = render(Options(name="test", preset="fullstack-azure"))
     assert "7071" in files["frontend/vite.config.ts"]
     assert "7071" in files["README.md"]
-    assert ("http://127.0.0.1:5173/api/health", True) in runner.endpoints(json.loads(files["forge.json"]))
+    assert ("http://127.0.0.1:5173/api/health", True) in runner.endpoints(json.loads(files["envee.json"]))

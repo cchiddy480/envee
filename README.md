@@ -27,8 +27,16 @@ For release maintenance, see [HOMEBREW.md](HOMEBREW.md).
 
 ### Upgrading from Forge
 
-Envee is the new name for Forge. Install the renamed package using the command above;
-once `envee --version` works, the old `forge-bootstrap` package can be uninstalled.
+Envee is the new name for Forge. If you installed Forge through the previous Homebrew
+tap, migrate first so Homebrew does not report a conflict between the two tap names:
+
+```sh
+brew uninstall cchiddy480/forge/forge-bootstrap
+brew untap cchiddy480/forge
+brew install cchiddy480/envee/envee
+```
+
+Uninstalling the old CLI leaves your generated projects in place.
 Existing projects work with `envee setup PATH` and `envee check PATH`: Envee reads
 their original `forge.json` without regenerating application files. Their existing
 `.forge/` logs remain in place. New projects use `envee.json` and `.envee/`.

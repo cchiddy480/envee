@@ -34,11 +34,13 @@ def test_global_ignore_preserves_rules_and_is_idempotent(tmp_path, monkeypatch, 
         subprocess.run(["git", "config", "--global", "core.excludesfile", str(path)], check=True)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text("# Existing user rules\nmy-local-file")
+    original = path.read_bytes()
     assert agent_tools.global_ignore() == path
     first = path.read_bytes()
     agent_tools.global_ignore()
     assert path.read_bytes() == first
-    assert first.startswith(b"# Existing user rules\nmy-local-file\n")
+    assert first.startswith(original)
+    assert path.read_text().startswith("# Existing user rules\nmy-local-file\n")
     assert all(rule in path.read_text() for rule in agent_tools.IGNORE_PATTERNS)
 
 

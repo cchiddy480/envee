@@ -17,13 +17,16 @@ Verified on 16 October 2026.
 - The real terminal review menu supports arrow keys, Create / Customise / Cancel,
   and cancellation without creating a project.
 
-Homebrew source installation, formula style and formula tests pass on Apple Silicon.
+Homebrew source installation from the public release URL, formula style and formula tests
+pass on Apple Silicon. A [hosted fresh tap installation](https://github.com/cchiddy480/homebrew-envee/actions/runs/38879232337)
+also passes.
 The globally installed 0.3 CLI creates a verified application using Homebrew Python,
 and runs daily commands from subdirectories without saving automation preferences.
 
 Release evidence is in [validation/envee-0.3.0.json](validation/envee-0.3.0.json).
-The [release CI workflow](https://github.com/cchiddy480/envee/actions) runs contracts on
-macOS, Linux and Windows with Python 3.12 and 3.14, plus all ten local starters on Linux.
+The [release CI run](https://github.com/cchiddy480/envee/actions/runs/38878801094) passed
+contracts on macOS, Linux and Windows with Python 3.12 and 3.14, plus all ten local
+starters on Linux.
 
 Full runtime management, additional stacks and arbitrary-repository adoption remain
 outside this release. Full interactive Windows sessions and Linux Homebrew installation

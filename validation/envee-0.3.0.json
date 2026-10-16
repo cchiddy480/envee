@@ -131,8 +131,7 @@
   "linux_starters": {
     "passed": true,
     "presets": 10,
-    "url": "https://github.com/cchiddy480/envee/actions/runs/38877872011",
-    "note": "Application source is unchanged in later test/evidence commits."
+    "url": "https://github.com/cchiddy480/envee/actions/runs/38878801094"
   },
   "homebrew": {
     "version": "0.3.0",
@@ -141,6 +140,13 @@
     "formula_test": true,
     "fresh_verified_cli_with_homebrew_python": true,
     "dev_and_doctor_from_subdirectory": true,
-    "no_noninteractive_preference_writes": true
-  }
+    "no_noninteractive_preference_writes": true,
+    "public_release_source_install": true,
+    "hosted_fresh_install": {
+      "passed": true,
+      "url": "https://github.com/cchiddy480/homebrew-envee/actions/runs/38879232337"
+    }
+  },
+  "release_archive_sha256": "64c9376e87009e263b0ff6929ca68213e2440cd2d20c6e480c1f5c484c60ae36",
+  "source_workflow_passed": true
 }

@@ -2,11 +2,11 @@
 
 Verified on 16 October 2026.
 
-- 140 contract tests pass locally, covering context-aware launch, Git-boundary discovery,
+- 140 contract tests pass on macOS, Linux and Windows with Python 3.12 and 3.14, covering context-aware launch, Git-boundary discovery,
   invalid manifests, remembered AI preferences, per-project overrides, previews, safe retries,
   aggregate diagnostics, optional-tool warning exits and foreground lifecycle handling.
 - All ten local starters pass fresh installation, builds, selected checks, real startup
-  verification and repeated setup on macOS Apple Silicon.
+  verification and repeated setup on macOS Apple Silicon and hosted Linux.
 - Real local and Docker Flask development report health URLs only after readiness,
   stop on Ctrl+C, release their ports and leave no managed Docker services running.
 - Dev Container host commands give the VS Code reopening workflow. Container setup
@@ -16,6 +16,10 @@ Verified on 16 October 2026.
   and checks pass. Packaged Ponytail assets are present when selected.
 - The real terminal review menu supports arrow keys, Create / Customise / Cancel,
   and cancellation without creating a project.
+
+Homebrew source installation, formula style and formula tests pass on Apple Silicon.
+The globally installed 0.3 CLI creates a verified application using Homebrew Python,
+and runs daily commands from subdirectories without saving automation preferences.
 
 Release evidence is in [validation/envee-0.3.0.json](validation/envee-0.3.0.json).
 The [release CI workflow](https://github.com/cchiddy480/envee/actions) runs contracts on

@@ -113,5 +113,34 @@
     "Full interactive Windows sessions not manually tested",
     "Linux Homebrew installation not tested",
     "Full Docker and Dev Container ten-starter matrices remain historical; representative current checks passed"
-  ]
+  ],
+  "ci_contracts": {
+    "passed": true,
+    "tests": 140,
+    "operating_systems": [
+      "macOS",
+      "Linux",
+      "Windows"
+    ],
+    "python": [
+      "3.12",
+      "3.14"
+    ],
+    "url": "https://github.com/cchiddy480/envee/actions/runs/38878801094"
+  },
+  "linux_starters": {
+    "passed": true,
+    "presets": 10,
+    "url": "https://github.com/cchiddy480/envee/actions/runs/38877872011",
+    "note": "Application source is unchanged in later test/evidence commits."
+  },
+  "homebrew": {
+    "version": "0.3.0",
+    "source_install": true,
+    "formula_style": true,
+    "formula_test": true,
+    "fresh_verified_cli_with_homebrew_python": true,
+    "dev_and_doctor_from_subdirectory": true,
+    "no_noninteractive_preference_writes": true
+  }
 }

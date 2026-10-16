@@ -4,6 +4,7 @@ import os
 import socket
 import subprocess
 import sys
+from types import SimpleNamespace
 
 from click.testing import CliRunner
 import pytest
@@ -207,7 +208,7 @@ def test_dev_stops_process_after_readiness_or_interruption(tmp_path, monkeypatch
         else:
             processes[0].terminate()
             processes[0].wait(timeout=10)
-    monkeypatch.setattr(runner.time, "sleep", sleep)
+    monkeypatch.setattr(runner, "time", SimpleNamespace(sleep=sleep, monotonic=runner.time.monotonic))
     with pytest.raises(KeyboardInterrupt if interrupt else RuntimeError):
         runner.dev(tmp_path / "project", manifest, True)
     assert processes[0].poll() is not None
@@ -255,7 +256,7 @@ HTTPServer(("127.0.0.1", {port}), Handler).serve_forever()
         if seconds == 0.2:
             raise KeyboardInterrupt
         original_sleep(seconds)
-    monkeypatch.setattr(runner.time, "sleep", sleep)
+    monkeypatch.setattr(runner, "time", SimpleNamespace(sleep=sleep, monotonic=runner.time.monotonic))
     with pytest.raises(KeyboardInterrupt):
         runner.dev(tmp_path / "project", manifest, True)
     assert f"Ready: {url}" in capsys.readouterr().out

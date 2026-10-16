@@ -47,7 +47,7 @@ def test_global_ignore_preserves_rules_and_is_idempotent(tmp_path, monkeypatch, 
 def test_agent_files_are_ignored_without_global_rules(tmp_path, monkeypatch):
     isolate_git(tmp_path, monkeypatch)
     project = tmp_path / "project"
-    write_files(project, render(Options(name="test", preset="python")))
+    write_files(project, render(Options(name="test", preset="python", codegraph=True, ponytail=True)))
     subprocess.run(["git", "init", str(project)], check=True, capture_output=True)
     paths = ["AGENTS.md", ".agents/skills/ponytail/SKILL.md", ".codegraph/codegraph.db", ".codex/config.toml"]
     for path in paths:
@@ -148,7 +148,7 @@ def test_old_manifests_skip_agent_changes(tmp_path, monkeypatch):
 
 
 def test_agent_manifest_flag_types_validated(tmp_path):
-    files = render(Options(name="test", preset="python"))
+    files = render(Options(name="test", preset="python", codegraph=True, ponytail=True))
     manifest = json.loads(files["envee.json"])
     manifest["codegraph"] = "false"
     (tmp_path / "envee.json").write_text(json.dumps(manifest))

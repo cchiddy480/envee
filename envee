@@ -8,7 +8,4 @@ if [ ! -x "$ENVEE_ROOT/.venv/bin/envee" ]; then
   "$ENVEE_PYTHON" -m venv "$ENVEE_ROOT/.venv"
   "$ENVEE_ROOT/.venv/bin/python" -m pip install "$ENVEE_ROOT"
 fi
-if [ "$#" -eq 0 ]; then
-  set -- init
-fi
 exec "$ENVEE_ROOT/.venv/bin/envee" "$@"

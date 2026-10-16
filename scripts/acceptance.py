@@ -53,14 +53,15 @@ def main():
         )
         environment = os.environ.copy()
         environment["ENVEE_PYTHON"] = sys.executable
-        assert "0.2.0" in command(["bash", str(checkout / "envee"), "--version"], checkout, environment)
+        environment["XDG_CONFIG_HOME"] = str(temporary / "config")
+        assert "0.3.0" in command(["bash", str(checkout / "envee"), "--version"], checkout, environment)
         project = temporary / "new-project"
         project.mkdir()
         output = command(
             ["bash", str(checkout / "envee")],
             project,
             environment,
-            "2\nacceptance-tool\n4\n1\ny\ny\ny\ny\ny\ny\ny\ny\n",
+            "4\nn\nn\n2\nacceptance-tool\n\n\n\n\ny\n\n\n\n\n1\nn\n",
         )
         assert "YOUR ENVIRONMENT IS READY" in output
         manifest = json.loads((project / "envee.json").read_text())
@@ -82,7 +83,7 @@ def main():
                           "--preset", "web", "--yes", "--no-git"], temporary)
         assert "YOUR ENVIRONMENT IS READY" in output
         assert command(["node", "--version"], temporary).strip() == active_node
-        wheel = root / "dist/envee-0.2.0-py3-none-any.whl"
+        wheel = root / "dist/envee-0.3.0-py3-none-any.whl"
         wheel_env = temporary / "wheel-env"
         command([sys.executable, "-m", "venv", str(wheel_env)], temporary)
         command([str(wheel_env / "bin/python"), "-m", "pip", "install", str(wheel)], temporary)

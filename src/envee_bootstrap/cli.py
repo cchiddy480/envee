@@ -17,7 +17,7 @@ from rich.text import Text
 from . import __version__
 from .model import Options, PRESETS
 from . import project_runner as runner
-from . import agent_tools
+from . import agent_tools, preferences
 from .templates import render
 
 console = Console(highlight=False)
@@ -123,10 +123,39 @@ def wizard_preset():
     return kind
 
 
-@click.group()
+@click.group(invoke_without_command=True)
 @click.version_option(__version__)
-def main():
+@click.pass_context
+def main(ctx):
     """ENVEE — your development environment, ready."""
+    if ctx.invoked_subcommand is not None:
+        return
+    try:
+        root = runner.discover(Path.cwd())
+        if root:
+            manifest = runner.load(root)
+            console.print(Panel(f"{manifest['name']}\n{PRESETS[manifest['preset']]}\n"
+                                f"Runs: {manifest['environment']}", title="ENVEE"), markup=False)
+            action = choose("What next?", [("dev", "Start development"), ("check", "Check project"),
+                            ("doctor", "Diagnose prerequisites"), ("setup", "Retry setup"),
+                            ("exit", "Exit")])
+            if action == "doctor":
+                ctx.invoke(doctor, directory=root)
+            elif action != "exit":
+                existing_project(root, action, False, False)
+        elif not any(Path.cwd().iterdir()):
+            ctx.invoke(init)
+        elif choose("This folder contains files. Create a project in a new child folder?",
+                    [("create", "Create in a new folder"), ("exit", "Exit")]) == "create":
+            child = click.prompt("New folder name")
+            destination = Path(child)
+            if destination.is_absolute() or len(destination.parts) != 1 or child in {".", ".."}:
+                raise ValueError("Choose a single child folder name.")
+            ctx.invoke(init, directory=Path.cwd() / child)
+    except click.exceptions.Exit:
+        raise
+    except (RuntimeError, OSError, ValueError) as exc:
+        raise click.ClickException(str(exc)) from exc
 
 
 @main.command("presets")
@@ -166,35 +195,23 @@ def init(
     if target.exists() and (not target.is_dir() or any(target.iterdir())):
         raise click.ClickException("The destination must be empty. Envee will not overwrite existing files.")
     interactive = not yes
-    console.print(Panel("[bold cyan]ENVEE[/bold cyan]\nYour development environment, ready.", border_style="cyan"))
-    if advanced is None:
-        advanced = interactive and choose(
-            "How would you like to set up?",
-            [("default", "Default setup — recommended tools, fewer questions"),
-             ("advanced", "Advanced setup — choose individual tools and database")],
-        ) == "advanced"
-    stages = 4 if advanced else 3
-    if interactive:
-        console.print(f"1 / {stages} · Choose your project", style="bold cyan")
+    console.print(Panel("[bold cyan]ENVEE[/bold cyan]\nGet ready to build.", border_style="cyan"))
+    advanced = bool(advanced)
     default_name = re.sub(r"[^a-z0-9]+", "-", target.name.lower()).strip("-")
-    if not default_name or not default_name[0].isalpha():
-        default_name = "my-project"
     if name is None:
-        name = click.prompt("Project name", default=default_name) if interactive else default_name
+        try:
+            Options(name=default_name, preset="python").validate()
+            name = default_name
+        except ValueError:
+            name = click.prompt("Project name", default="my-project") if interactive else "my-project"
     if preset is None:
         preset = wizard_preset() if interactive else "python"
-    if environment is None:
-        if interactive:
-            console.print(f"\n2 / {stages} · Choose where it runs", style="bold cyan")
-        environment = (
-            choose(
-                "Where should it run?",
-                [("local", "Local — use tools on this computer"), ("docker", "Docker — run in containers"),
-                 ("devcontainer", "Dev Container — develop inside VS Code")],
-            )
-            if interactive
-            else "local"
-        )
+    environment = environment or "local"
+    database = database or "none"
+    try:
+        saved = preferences.load()
+    except ValueError as exc:
+        raise click.ClickException(str(exc)) from exc
     choices = {
         "git": (git, True, "Initialise Git?"),
         "lint": (lint, True, "Add a formatter and linter?"),
@@ -202,71 +219,109 @@ def init(
         "ci": (ci, False, "Add GitHub Actions?"),
         "editor": (editor, True, "Add VS Code configuration?"),
         "env": (env, True, "Add environment-file examples?"),
-        "codegraph": (codegraph, True, "Add CodeGraph indexing and Codex integration?"),
-        "ponytail": (ponytail, True, "Add the Ponytail core coding skill?"),
+        "codegraph": (codegraph, saved.get("codegraph", False), "Add CodeGraph?"),
+        "ponytail": (ponytail, saved.get("ponytail", False), "Add Ponytail?"),
     }
-    values = {}
+    values = {key: default if value is None else value for key, (value, default, _) in choices.items()}
+    remembered = dict(saved)
+    if interactive:
+        for key in ("codegraph", "ponytail"):
+            if key not in saved:
+                explain_ai(key)
+                explicit = choices[key][0]
+                if explicit is None and not advanced:
+                    values[key] = click.confirm(choices[key][2], default=False)
+                remembered[key] = values[key]
+
+    def customise():
+        nonlocal environment, database, name
+        name = click.prompt("Project name", default=name)
+        environment = choose("Where should it run?", [
+            ("local", "Local — tools on this computer"), ("docker", "Docker — containers"),
+            ("devcontainer", "Dev Container — VS Code")],
+            default=["local", "docker", "devcontainer"].index(environment) + 1)
+        for key, (_, _, question) in choices.items():
+            values[key] = click.confirm(question, default=values[key])
+        if preset.removeprefix("fullstack-") in {"flask", "fastapi"}:
+            database = "sqlite" if click.confirm("Add a local SQLite database?",
+                                                default=database == "sqlite") else "none"
     if interactive and advanced:
-        console.print("\n3 / 4 · Choose your tools", style="bold cyan")
-        console.print("Press Enter to accept each recommended default. [Y/n] means yes; [y/N] means no.",
-                      style="dim", markup=False)
-    for key, (value, default, question) in choices.items():
-        values[key] = (
-            value
-            if value is not None
-            else click.confirm(question, default=default)
-            if interactive and advanced
-            else default
-        )
-    if database is None:
-        database = (
-            "sqlite"
-            if interactive
-            and advanced
-            and preset.removeprefix("fullstack-") in {"flask", "fastapi"}
-            and click.confirm("Add a local SQLite database?", default=False)
-            else "none"
-        )
+        customise()
+        for key in ("codegraph", "ponytail"):
+            if key not in saved:
+                remembered[key] = values[key]
     options = Options(name=name, preset=preset, environment=environment, database=database, **values)
     try:
         options.validate()
         files = render(options)
         manifest = json.loads(files["envee.json"])
-        table = Table(show_header=False, box=None)
-        for key, value in [
-            ("Setup", "Advanced" if advanced else "Default"),
-            ("Project", name),
-            ("Preset", PRESETS[preset]),
-            ("Environment", environment),
-            ("Destination", str(target)),
-            ("Files", str(len(files))),
-        ]:
-            table.add_row(key, value)
-        labels = {"git": "Git", "lint": "Formatter / linter", "tests": "Tests",
-                  "ci": "GitHub Actions", "editor": "VS Code", "env": "Environment examples",
-                  "codegraph": "CodeGraph", "ponytail": "Ponytail"}
-        enabled = [labels[key] for key, enabled in values.items() if enabled]
-        table.add_row("Tools", ", ".join(enabled) or "None")
-        table.add_row("Database", database)
-        console.print(Panel(table, title=f"{stages} / {stages} · Your project", border_style="cyan"))
+        while True:
+            table = Table(show_header=False, box=None)
+            for key, value in [
+                ("Setup", "Advanced" if advanced else "Default"),
+                ("Project", name),
+                ("Preset", PRESETS[preset]),
+                ("Environment", environment),
+                ("Destination", str(target)),
+                ("Files", str(len(files))),
+            ]:
+                table.add_row(key, value)
+            labels = {"git": "Git", "lint": "Formatter / linter", "tests": "Tests",
+                      "ci": "GitHub Actions", "editor": "VS Code", "env": "Environment examples",
+                      "codegraph": "CodeGraph", "ponytail": "Ponytail"}
+            enabled = [labels[key] for key, enabled in values.items() if enabled]
+            table.add_row("Tools", ", ".join(enabled) or "None")
+            table.add_row("Database", database)
+            console.print(Panel(table, title="Your project", border_style="cyan"))
+            if dry_run or not interactive:
+                break
+            action = choose("Ready to create?", [("create", "Create"), ("customise", "Customise"),
+                                                ("cancel", "Cancel")])
+            if action == "cancel":
+                console.print("Cancelled. No files created.")
+                return
+            if action == "create":
+                break
+            customise()
+            options = Options(name=name, preset=preset, environment=environment, database=database, **values)
+            options.validate()
+            files = render(options)
+            manifest = json.loads(files["envee.json"])
         if dry_run:
             for path in sorted(files):
                 console.print(f"  {path}", markup=False)
             console.print("Preview only. No files created.")
             return
         if install:
-            runner.preflight(manifest, environment == "local")
+            try:
+                runner.preflight(manifest, environment == "local")
+            except RuntimeError as exc:
+                if not (interactive and environment == "local" and
+                        not runner.prerequisite_problems(manifest, False)):
+                    raise
+                console.print(str(exc), style="yellow", markup=False)
+                console.print("Docker is available for this new project.", style="cyan")
+                if not click.confirm("Use Docker for this new project?", default=False):
+                    raise
+                environment = "docker"
+                options = Options(name=name, preset=preset, environment=environment, database=database, **values)
+                files = render(options)
+                manifest = json.loads(files["envee.json"])
+                runner.preflight(manifest, False)
         if options.git:
             runner.executable("git")
         write_files(target, files)
+        if interactive and remembered != saved:
+            preferences.save(remembered)
         console.print("✓ Project files created", style="green")
         if options.git:
             runner.run(["git", "init", "--initial-branch=main"], target)
+        warnings = []
         if install:
             with progress(target, "setup"):
                 runner.setup(target, manifest, environment == "local")
-                agent_tools.setup(target, manifest)
-            console.print("\n✓ YOUR ENVIRONMENT IS READY", style="bold green")
+                warnings = agent_tools.setup(target, manifest) or []
+            report_ready(target, warnings)
         else:
             console.print(
                 "\n✓ Project created. Dependencies and startup have not been verified.", style="yellow"
@@ -274,14 +329,17 @@ def init(
         console.print(f"\nOpen: {target}", markup=False)
         console.print(f"First: cd {shlex.quote(str(target))}", markup=False)
         if not install:
-            console.print("Next: envee setup ." if options.codegraph or options.ponytail
-                          else "Next: python3 scripts/project.py setup")
+            console.print("Next: envee setup .")
         elif environment == "devcontainer":
             console.print("Next: open in VS Code → Dev Containers: Reopen in Container")
-        elif environment == "docker":
-            console.print("Start: docker compose up")
         else:
-            console.print("Start: python3 scripts/project.py dev")
+            console.print("Start: envee dev")
+        if install and interactive and click.confirm("Start now?", default=False):
+            existing_project(target, "dev", False, False)
+        if warnings:
+            raise click.exceptions.Exit(3)
+    except click.exceptions.Exit:
+        raise
     except (ValueError, RuntimeError, OSError) as exc:
         suffix = (
             f"\nYour files are preserved. Retry with: envee setup {shlex.quote(str(target))}"
@@ -306,22 +364,37 @@ def write_files(target, files):
 
 
 def existing_project(directory, action, local, skip_runtime):
-    root = directory.resolve()
     try:
+        root = runner.discover(directory)
+        if root is None:
+            raise RuntimeError("No Envee project found. Use envee init in an empty folder.")
         manifest = runner.load(root)
         use_local = (
             local
             or manifest["environment"] == "local"
             or (manifest["environment"] == "devcontainer" and Path("/.dockerenv").exists())
         )
+        if action == "dev":
+            try:
+                runner.dev(root, manifest, use_local)
+            except KeyboardInterrupt:
+                console.print("\nStopped.")
+            return
+        warnings = []
         with progress(root, action):
             if action == "setup":
                 runner.setup(root, manifest, use_local, skip_runtime)
-                agent_tools.setup(root, manifest)
+                warnings = agent_tools.setup(root, manifest) or []
             else:
                 runner.check(root, manifest, use_local, skip_runtime)
+        if action == "setup":
+            report_ready(root, warnings, verified=not skip_runtime)
+            if warnings:
+                raise click.exceptions.Exit(3)
+    except click.exceptions.Exit:
+        raise
     except (RuntimeError, OSError, ValueError, KeyError) as exc:
-        raise click.ClickException(str(exc)) from exc
+        raise click.ClickException(str(exc) + f"\nRetry: envee {action} {shlex.quote(str(directory))}") from exc
 
 
 @main.command()
@@ -343,17 +416,86 @@ def check(directory, local, skip_runtime):
 
 
 @main.command()
-@click.option("--preset", type=click.Choice(list(PRESETS)), default="python")
-@click.option("--environment", type=click.Choice(["local", "docker", "devcontainer"]), default="local")
-def doctor(preset, environment):
-    """Check prerequisites without installing or creating files."""
-    options = Options(name="doctor", preset=preset, environment=environment)
+@click.argument("directory", type=click.Path(path_type=Path), default=".")
+@click.option("--local", is_flag=True)
+def dev(directory, local):
+    """Start development, report readiness and stop cleanly with Ctrl+C."""
+    existing_project(directory, "dev", local, False)
+
+
+@main.command()
+@click.argument("directory", type=click.Path(path_type=Path), default=".")
+@click.option("--preset", type=click.Choice(list(PRESETS)), default=None)
+@click.option("--environment", type=click.Choice(["local", "docker", "devcontainer"]), default=None)
+def doctor(directory, preset, environment):
+    """Diagnose prerequisites without installing or creating files."""
     try:
-        manifest = json.loads(render(options)["envee.json"])
-        runner.preflight(manifest, environment == "local")
-        console.print(f"✓ Prerequisites available for {preset} / {environment}", style="green")
-        console.print(f"Python {sys.version.split()[0]}")
+        root = runner.discover(directory)
+        manifest = runner.load(root) if root else json.loads(render(Options(
+            name="doctor", preset=preset or "python", environment=environment or "local"))["envee.json"])
+        if preset is not None:
+            manifest = json.loads(render(Options(name="doctor", preset=preset,
+                                  environment=environment or manifest["environment"]))["envee.json"])
+        if environment is not None:
+            manifest["environment"] = environment
+        use_local = manifest["environment"] == "local" or (
+            manifest["environment"] == "devcontainer" and Path("/.dockerenv").exists())
+        problems = runner.prerequisite_problems(manifest, use_local)
+        if problems:
+            raise RuntimeError("Prerequisite problems:\n- " + "\n- ".join(problems) +
+                               "\nAfter fixing these, retry: envee doctor " + shlex.quote(str(root or directory)))
+        console.print(f"✓ Prerequisites available for {manifest['preset']} / {manifest['environment']}",
+                      style="green")
+        if root:
+            console.print(f"Next: envee setup {shlex.quote(str(root))}", markup=False)
+    except click.exceptions.Exit:
+        raise
     except (RuntimeError, OSError, ValueError) as exc:
+        raise click.ClickException(str(exc)) from exc
+
+
+def explain_ai(key):
+    if key == "codegraph":
+        console.print("CodeGraph creates a local code index for coding assistants. Setup may download "
+                      "CodeGraph with its own runtime; it creates .codegraph/ and local Codex MCP settings.",
+                      markup=False)
+    else:
+        console.print("Ponytail adds bundled coding guidelines that favour small, complete solutions "
+                      "in .agents/skills/ponytail/ and AGENTS.md. Plugin hooks are separate.", markup=False)
+    console.print("Envee adds local AI files to the project and global Git-ignore rules during setup.",
+                  markup=False)
+
+
+def report_ready(root, warnings, verified=True):
+    if verified:
+        console.print("Application ready—with warnings" if warnings else "✓ YOUR ENVIRONMENT IS READY",
+                      style="yellow" if warnings else "bold green")
+    else:
+        console.print("Dependencies checked; application startup has not been verified.", style="yellow")
+    for warning in warnings:
+        console.print(f"Warning: {warning}", markup=False, style="yellow")
+    if warnings:
+        console.print(f"Retry: envee setup {shlex.quote(str(root))}", markup=False)
+
+
+@main.command()
+@click.option("--codegraph/--no-codegraph", default=None)
+@click.option("--ponytail/--no-ponytail", default=None)
+def config(codegraph, ponytail):
+    """Edit remembered optional AI preferences for future projects."""
+    try:
+        values = preferences.load()
+        interactive = codegraph is None and ponytail is None
+        for key, explicit in [("codegraph", codegraph), ("ponytail", ponytail)]:
+            if explicit is not None:
+                values[key] = explicit
+            elif interactive:
+                explain_ai(key)
+                values[key] = click.confirm(f"Enable {key.title()} for future projects?",
+                                            default=values.get(key, False))
+        preferences.save(values)
+        console.print(f"Preferences saved: {preferences.path()}", markup=False)
+    except (ValueError, OSError) as exc:
         raise click.ClickException(str(exc)) from exc
 
 

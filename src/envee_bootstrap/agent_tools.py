@@ -114,14 +114,24 @@ def setup(root, manifest):
     """Index on the host and install project-scoped MCP configuration once."""
     if not (manifest.get("codegraph", False) or manifest.get("ponytail", False)):
         return
-    path = global_ignore()
-    print(f"Global ignore rules ready: {path}", flush=True)
+    warnings = []
+    try:
+        path = global_ignore()
+        print(f"Global ignore rules ready: {path}", flush=True)
+    except (RuntimeError, OSError, ValueError) as exc:
+        selected = ", ".join(name for key, name in [("codegraph", "CodeGraph"), ("ponytail", "Ponytail")]
+                             if manifest.get(key, False))
+        warnings.append(f"{selected}: global Git-ignore setup failed: {exc}")
     if manifest.get("codegraph", False):
-        command = codegraph_command()
-        runner.run([*command, "--version"], root)
-        action = "sync" if (root / ".codegraph").exists() else "init"
-        runner.run([*command, action, str(root)], root)
-        configure_codex(root, command)
+        try:
+            command = codegraph_command()
+            runner.run([*command, "--version"], root)
+            action = "sync" if (root / ".codegraph").exists() else "init"
+            runner.run([*command, action, str(root)], root)
+            configure_codex(root, command)
+        except (RuntimeError, OSError, ValueError) as exc:
+            warnings.append(f"CodeGraph setup failed: {exc}")
+    return warnings
 
 
 def configure_codex(root, command):

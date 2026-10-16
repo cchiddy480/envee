@@ -103,23 +103,61 @@ def load(root):
     return manifest
 
 
-def preflight(manifest, local, skip_runtime=False):
-    """Check everything needed before downloading dependencies."""
+def prerequisite_problems(manifest, local, skip_runtime=False):
+    """Collect independent failures so one doctor visit gives the whole picture."""
+    problems = []
+    def attempt(check):
+        try:
+            check()
+        except (RuntimeError, OSError, ValueError) as exc:
+            problems.append(str(exc))
     if sys.version_info < (3, 12):
-        raise RuntimeError("Python 3.12 or newer is required.")
+        problems.append("Python 3.12 or newer is required. Install Python, then retry envee setup.")
+    if manifest.get("git") and not shutil.which("git"):
+        problems.append("Git is missing. Install Git, then retry envee setup.")
     if not local:
-        docker = executable("docker")
-        capture([docker, "info", "--format", "{{.ServerVersion}}"])
-        capture([docker, "compose", "version"])
-        return
+        if shutil.which("docker"):
+            attempt(lambda: capture([executable("docker"), "info", "--format", "{{.ServerVersion}}"]))
+            attempt(lambda: capture([executable("docker"), "compose", "version"]))
+            if problems:
+                problems.append("Start Docker and ensure Docker Compose is available, then retry envee doctor.")
+        else:
+            problems.append("Docker is missing. Install and start Docker, then retry envee doctor.")
+        return problems
     kinds = {c["kind"] for c in manifest["components"]}
     if kinds & NODE_KINDS:
-        select_node()
-        executable("npm")
+        attempt(select_node)
+        if not shutil.which("npm"):
+            problems.append("npm is missing. Install Node 22 with npm, then retry envee setup.")
     if "azure" in kinds and not skip_runtime:
-        version = capture([executable("func"), "--version"])
-        if not version.startswith("4."):
-            raise RuntimeError("Azure Functions Core Tools v4 is required.")
+        def azure():
+            version = capture([executable("func"), "--version"])
+            if not version.startswith("4."):
+                raise RuntimeError("Azure Functions Core Tools v4 is required.")
+        attempt(azure)
+        if any("func" in problem.lower() for problem in problems):
+            problems.append("Install Azure Functions Core Tools v4, then retry envee doctor.")
+    return problems
+
+
+def preflight(manifest, local, skip_runtime=False):
+    problems = prerequisite_problems(manifest, local, skip_runtime)
+    if problems:
+        raise RuntimeError("Prerequisite problems:\n- " + "\n- ".join(problems))
+
+
+def discover(directory):
+    """Find the nearest manifest, without crossing a Git checkout boundary."""
+    root = directory.resolve()
+    if not root.is_dir():
+        raise RuntimeError(f"Directory does not exist: {root}")
+    for candidate in (root, *root.parents):
+        if any((candidate / name).exists() for name in ("envee.json", "forge.json")):
+            load(candidate)
+            return candidate
+        if (candidate / ".git").exists():
+            break
+    return None
 
 
 def select_node():
@@ -402,6 +440,66 @@ def probe(urls, processes=(), timeout=90):
         raise RuntimeError("Startup did not become ready: " + ", ".join(url for url, _ in pending))
 
 
+def available_ports(urls):
+    """Reject occupied ports before a different service can pass readiness."""
+    import socket
+
+    for url, _ in urls:
+        port = int(url.split(":")[2].split("/")[0])
+        with socket.socket() as sock:
+            sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            try:
+                sock.bind(("127.0.0.1", port))
+            except OSError as exc:
+                raise RuntimeError(
+                    f"Port {port} is in use. Stop the other service, then retry."
+                ) from exc
+
+
+def dev(root, manifest, local):
+    """Run in the foreground and own every process until shutdown."""
+    if manifest["environment"] == "devcontainer" and not local:
+        print("Open this project in VS Code → Dev Containers: Reopen in Container.\n"
+              "Inside the container, run: python3 scripts/project.py dev --local", flush=True)
+        return
+    preflight(manifest, local)
+    urls = endpoints(manifest)
+    if not urls:
+        if local:
+            for c in manifest["components"]:
+                cwd = root / c["path"]
+                if c["kind"] == "typescript":
+                    run([executable("npm"), "run", "build"], cwd)
+                run(dev_command(cwd, c["kind"]), cwd)
+        else:
+            try:
+                for c in manifest["components"]:
+                    run(["docker", "compose", "run", "--rm", "--build", service_name(manifest, c)], root)
+            finally:
+                run(["docker", "compose", "down", "--remove-orphans"], root, timeout=90)
+        return
+    available_ports(urls)
+    processes = []
+    try:
+        if local:
+            processes = start(root, manifest)
+        else:
+            processes = [subprocess.Popen([executable("docker"), "compose", "up", "--build", "--abort-on-container-exit"],
+                         cwd=root, start_new_session=os.name != "nt")]
+        probe(urls, processes)
+        for url, _ in urls:
+            print(f"Ready: {url}", flush=True)
+        print("Press Ctrl+C to stop.", flush=True)
+        while True:
+            if any(p.poll() is not None for p in processes):
+                raise RuntimeError("A development server exited. Check its output, then retry envee dev.")
+            time.sleep(0.2)
+    finally:
+        stop(processes)
+        if not local:
+            run(["docker", "compose", "down"], root, timeout=90)
+
+
 def smoke(root, manifest, local):
     """Check startup while leaving no servers running."""
     urls = endpoints(manifest)
@@ -437,19 +535,7 @@ def smoke(root, manifest, local):
                         timeout=30,
                     )
         return
-    # Fail before starting if the port is occupied; never mistake another service for this project.
-    import socket
-
-    for url, _ in urls:
-        port = int(url.split(":")[2].split("/")[0])
-        with socket.socket() as sock:
-            sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-            try:
-                sock.bind(("127.0.0.1", port))
-            except OSError as exc:
-                raise RuntimeError(
-                    f"Port {port} is in use. Stop the other service, then retry check."
-                ) from exc
+    available_ports(urls)
     if local:
         processes = start(root, manifest, quiet=True)
         try:
@@ -514,26 +600,13 @@ def main():
             setup(root, manifest, local, args.skip_runtime)
         elif args.action == "check":
             check(root, manifest, local, args.skip_runtime)
-        elif not local:
-            run(["docker", "compose", "up", "--build"], root, timeout=86400)
         else:
-            preflight(manifest, True)
-            processes = start(root, manifest)
-            try:
-                while True:
-                    exited = [p for p in processes if p.poll() is not None]
-                    if exited:
-                        if any(p.returncode for p in exited):
-                            raise RuntimeError("A development process failed. See its output above.")
-                        break
-                    time.sleep(0.2)
-            finally:
-                stop(processes)
+            dev(root, manifest, local)
     except KeyboardInterrupt:
         print("\nStopped.")
     except (RuntimeError, OSError, KeyError, ValueError) as exc:
         print(
-            f"\nSetup failed: {exc}\nFix the issue and rerun python3 scripts/project.py setup.",
+            f"\n{args.action.capitalize()} failed: {exc}\nRetry python3 scripts/project.py {args.action}.",
             file=sys.stderr,
         )
         return 1

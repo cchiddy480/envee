@@ -46,7 +46,7 @@ def test_new_brand_and_version(tmp_path):
     assert result.exit_code == 0, result.output
     assert "ENVEE" in result.output and "FORGE" not in result.output
     manifest = json.loads((tmp_path / "brand/envee.json").read_text())
-    assert manifest["envee_version"] == "0.2.0"
+    assert manifest["envee_version"] == "0.3.0"
 
 
 @pytest.mark.parametrize("keys,expected", [(["\x1b[B", "\r"], "b"), (["\x1b[A", "\r"], "c"), (["2", "\r"], "b")])
@@ -172,7 +172,7 @@ def test_wizard_fullstack(tmp_path):
     result = CliRunner().invoke(
         main,
         ["init", str(tmp_path / "wizard"), "--no-install", "--no-git"],
-        input="2\nmy-project\n3\n2\n1\ny\ny\nn\ny\ny\ny\ny\ny\n",
+        input="3\n2\nn\nn\n2\n" + "\n" * 10 + "y\n1\n",
     )
     assert result.exit_code == 0, result.output
     manifest = json.loads((tmp_path / "wizard/envee.json").read_text())
@@ -184,7 +184,7 @@ def test_wizard_fullstack(tmp_path):
 def test_default_wizard_skips_tool_questions(tmp_path):
     result = CliRunner().invoke(
         main, ["init", str(tmp_path / "default"), "--no-install", "--no-git"],
-        input="\nmy-project\n3\n2\n1\n",
+        input="3\n2\nn\nn\n1\n",
     )
     assert result.exit_code == 0, result.output
     manifest = json.loads((tmp_path / "default/envee.json").read_text())
@@ -194,7 +194,8 @@ def test_default_wizard_skips_tool_questions(tmp_path):
     assert manifest["database"] == "none"
     assert "Add tests?" not in result.output
     assert "Add a local SQLite" not in result.output
-    assert "3 / 3" in result.output
+    assert "Ready to create?" in result.output
+    assert "How would you like" not in result.output
 
 
 @pytest.mark.parametrize("preset", PRESETS)
@@ -202,7 +203,7 @@ def test_default_route_honours_flags(tmp_path, preset):
     result = CliRunner().invoke(
         main, ["init", str(tmp_path / preset), "--default", "--name", "test-app",
                "--preset", preset, "--environment", "local", "--ci", "--no-lint",
-               "--no-git", "--no-install"],
+               "--no-git", "--no-install"], input="n\nn\n1\n",
     )
     assert result.exit_code == 0, result.output
     manifest = json.loads((tmp_path / preset / "envee.json").read_text())

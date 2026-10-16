@@ -1,6 +1,6 @@
 # Envee
 
-**Empty folder → one command → a few choices → a verified development environment.**
+**Get a project ready, start it reliably, and return to it effortlessly.**
 
 Envee creates new projects with the languages and conventions already used in `dev-env`.
 It never imports application code, credentials or licensed assets from that workspace.
@@ -70,17 +70,18 @@ The Windows helper is a preview; this release was validated on macOS and Linux c
 
 ## Launch choices
 
-The wizard starts with two setup routes:
+Type `envee` anywhere. Empty folders open project creation. Inside an Envee or legacy
+Forge project, a short menu shows its name, stack and execution mode with Start,
+Check, Diagnose and Retry setup actions. Other folders offer creation in a child folder.
+Discovery works from subdirectories and stops at a Git repository boundary.
 
-- **Default:** choose your project and environment. Git, formatting/linting, tests,
-  VS Code settings, environment examples, CodeGraph and Ponytail are included.
-  CI and databases are off.
-- **Advanced:** make the same project choices, then select each development tool
-  and optionally SQLite for Python APIs.
-
-Skip the route menu with `envee init ./my-project --default` or
-`envee init ./my-project --advanced`. Explicit flags override either route's defaults;
-`--yes` remains fully noninteractive.
+`envee init [directory]` goes straight to project choices, infers a valid project name
+from the destination, then shows **Create / Customise / Cancel**. Local execution is
+the default. Git, formatting, tests, editor settings and environment examples are on;
+CI and databases are off. Customise or `--advanced` exposes execution mode, tools and
+SQLite for Python APIs, preserving your earlier answers. `--default` remains supported.
+Explicit flags override saved preferences. `--yes` is completely noninteractive.
+After verified interactive creation, Envee offers **Start now**.
 
 ### Agent tools
 
@@ -97,7 +98,15 @@ Ponytail's MIT-licensed core skill (5.2.0) is included under `.agents/skills/pon
 with local `AGENTS.md` instructions. Its plugin lifecycle hooks and additional slash
 commands are separate; an existing Ponytail plugin remains available.
 
-Use `--no-codegraph` or `--no-ponytail` to opt out. Advanced setup asks about both.
+Both AI tools start unselected. First interactive creation explains each tool and
+asks once, then remembers the choices for future projects. `envee config` revisits
+them; `envee config --codegraph --no-ponytail` also works without prompts.
+Preferences live in `$XDG_CONFIG_HOME/envee/config.json` (default
+`~/.config/envee/config.json`), or `%APPDATA%/envee/config.json` on Windows.
+`--codegraph`, `--no-codegraph`, `--ponytail` and `--no-ponytail` override them for one
+project. Advanced changes are per-project; existing manifests retain their tools.
+Noninteractive creation without preferences leaves both off. Help, doctor, previews
+and noninteractive setup never save preferences. Cancelled creation saves nothing.
 Installation adds local tool files to the existing global Git ignore file, respecting
 `core.excludesfile` and existing rules. Generated projects also ignore them directly,
 so agent instructions, skills, MCP settings and graph databases stay out of commits.
@@ -128,10 +137,14 @@ envee init ./preview --preset web --yes --dry-run
 envee init ./source-only --preset cli --yes --no-install
 envee setup ./my-app
 envee check ./my-app
+envee doctor ./my-app
+envee dev ./my-app
+envee config
 ```
 
 Every wizard choice has a matching flag. `--yes` fills unanswered choices with defaults:
 minimal Python, local, Git/lint/tests/editor/environment examples on, CI/database off.
+AI extras use saved preferences, or remain off without them.
 `--dry-run` writes nothing. `--no-install` creates source only and never claims it is verified.
 The target must be empty, including hidden files; there is intentionally no overwrite flag.
 
@@ -149,6 +162,17 @@ processes. It does not change your shell or download a runtime silently.
 Docker mode resolves lockfiles inside Node containers, builds images, runs checks inside them,
 and verifies live startup. Dev Container mode also supplies an image with Python and Node;
 VS Code performs setup inside that container when you open it.
+
+`envee dev` runs local or Docker development in the foreground, reports verified service
+URLs and cleans up managed processes on Ctrl+C or failure. CLI/minimal projects run
+once. Dev Containers keep the VS Code reopening workflow with direct host guidance.
+`envee doctor` reports prerequisite problems together, with remedies; it never installs
+runtimes or changes an existing project's execution mode.
+
+If application verification passes but an optional AI tool fails, Envee reports
+**Application ready—with warnings**, names the failure and gives an `envee setup` retry.
+Exit codes: **0** success, **1** required failure, **2** usage error, **3** optional-tool
+failure after application checks. Skipped startup is always labelled unverified.
 
 If setup fails, source remains in place. Fix the reported prerequisite or download issue,
 then run `envee setup PATH`. Each generated project includes a standalone standard-library
@@ -178,8 +202,8 @@ Flutter and arbitrary package-manager selection are outside this release.
 ## Development and testing
 
 The wizard uses arrow keys and Enter in a terminal, with numbered choices when input is
-piped. Default setup has three stages: project, environment and summary. Advanced setup
-adds a tool-selection stage.
+piped. The recommended flow asks for a project type and necessary backend or language,
+then shows a review screen. Customisation keeps the previous answers.
 During setup, a spinner shows the current task; full installation output is saved to
 `.envee/setup.log`. Failures show the last diagnostic lines and a retry command.
 `envee check` saves its output to `.envee/check.log`. Completion tells you which folder

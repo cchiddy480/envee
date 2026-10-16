@@ -7,5 +7,5 @@ if (-not (Test-Path $EnveeCommand)) {
     & $EnveePython -m pip install $PSScriptRoot
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 }
-if ($args.Count -eq 0) { & $EnveeCommand init } else { & $EnveeCommand @args }
+& $EnveeCommand @args
 exit $LASTEXITCODE

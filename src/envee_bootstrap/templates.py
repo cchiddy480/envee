@@ -786,8 +786,6 @@ def container_files(f, o, components):
 
 def readme(o, components):
     commands = "python3 scripts/project.py dev"
-    if o.environment == "docker":
-        commands = "docker compose up --build"
     if o.environment == "devcontainer":
         commands = "Open this folder in VS Code and choose **Dev Containers: Reopen in Container**.\n\nInside the container:\n\n```sh\npython3 scripts/project.py dev\n```"
     else:
@@ -801,6 +799,11 @@ def readme(o, components):
 
         __COMMANDS__
 
+        With Envee installed, use `envee dev` to start, `envee check` to verify,
+        `envee doctor` to diagnose prerequisites and `envee setup` to retry setup.
+        These work from project subdirectories too. The commands above and below
+        also work independently, without installing Envee.
+
         ## Setup and verification
 
         ```sh
@@ -810,8 +813,8 @@ def readme(o, components):
 
         Setup is safe to rerun: it preserves your source and settings, installs dependencies,
         and runs the selected checks. For local setup regardless of environment, add `--local`.
-        Ctrl+C stops all local development processes. Docker users stop with `docker compose down`.
-        Images must be rebuilt after source changes; this first release does not mount live source in Docker mode.
+        Ctrl+C stops managed development processes and Docker services. Service URLs appear after readiness checks.
+        Images must be rebuilt after source changes; Docker mode does not mount live source.
 
         ## Requirements
 

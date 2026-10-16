@@ -1,0 +1,117 @@
+{
+  "version": "0.3.0",
+  "verified_on": "2026-10-16",
+  "local_contracts": {
+    "passed": true,
+    "tests": 140
+  },
+  "local_starters": [
+    {
+      "preset": "web",
+      "environment": "local",
+      "minimal_options": false,
+      "passed": true,
+      "files_sha256": "a0b7343dcb3cd4eca17d1ba93130cf579dfb8a18b2e80180432065a2e290495c",
+      "seconds": 35.74
+    },
+    {
+      "preset": "flask",
+      "environment": "local",
+      "minimal_options": false,
+      "passed": true,
+      "files_sha256": "0682fceba93f017e88351bcfc9e095c6445440358b118def34ddc3a8b20209b9",
+      "seconds": 13.89
+    },
+    {
+      "preset": "fastapi",
+      "environment": "local",
+      "minimal_options": false,
+      "passed": true,
+      "files_sha256": "6ac69aa28b53186be1010fbebbd106b75bf0a7c6f9d371c4338aa752da859b34",
+      "seconds": 14.75
+    },
+    {
+      "preset": "azure",
+      "environment": "local",
+      "minimal_options": false,
+      "passed": true,
+      "files_sha256": "ce1b3f7acbf3a58a027a965d823babbe229505f56b4755a7c0db2f2cf96f7e66",
+      "seconds": 11.52
+    },
+    {
+      "preset": "fullstack-flask",
+      "environment": "local",
+      "minimal_options": false,
+      "passed": true,
+      "files_sha256": "20f248de8d3f09734bf830cb6499de9deac7eabd74c822dfbfff1628d58260ed",
+      "seconds": 27.53
+    },
+    {
+      "preset": "fullstack-fastapi",
+      "environment": "local",
+      "minimal_options": false,
+      "passed": true,
+      "files_sha256": "d3280c742e912b242afddcce656d0baf1f8a6a2d18871061c1cb57da5a1dfc92",
+      "seconds": 28.84
+    },
+    {
+      "preset": "fullstack-azure",
+      "environment": "local",
+      "minimal_options": false,
+      "passed": true,
+      "files_sha256": "2b5e83834935461bed6cf3ae56989ce444cffdf8499d0c4fbdb570da257988bc",
+      "seconds": 25.99
+    },
+    {
+      "preset": "cli",
+      "environment": "local",
+      "minimal_options": false,
+      "passed": true,
+      "files_sha256": "efaa0760bdc3f8610c19c57af1b18dcac34147f3445b57553505bb0872471a35",
+      "seconds": 8.5
+    },
+    {
+      "preset": "python",
+      "environment": "local",
+      "minimal_options": false,
+      "passed": true,
+      "files_sha256": "a6c69c2ad536ffbd6053ea051967cca3ee6ed9b6f9020a2f558abd04182d86a8",
+      "seconds": 6.54
+    },
+    {
+      "preset": "typescript",
+      "environment": "local",
+      "minimal_options": false,
+      "passed": true,
+      "files_sha256": "f07f3d193b10db2e83c8fc2238a48d9ae2f749229e3a9cff66c8ff808df4cfb0",
+      "seconds": 8.09
+    }
+  ],
+  "fresh_install_acceptance": {
+    "passed": true,
+    "fresh_launcher_install": true,
+    "real_interactive_wizard": true,
+    "verified_cli_project": true,
+    "git_and_secret_exclusions": true,
+    "retry_preserves_source": true,
+    "fresh_teammate_setup_preserves_source_and_settings": true,
+    "installed_project_command": true,
+    "web_init_ready_with_existing_runtime": true,
+    "original_node_version": "v26.5.0",
+    "parent_shell_runtime_unchanged": true,
+    "wheel_install_and_generation": true,
+    "docker_cli_init_and_check": true,
+    "devcontainer_cli_init_and_check": true
+  },
+  "daily_development": {
+    "local_foreground_readiness_and_clean_interrupt": true,
+    "docker_foreground_readiness_and_clean_interrupt": true,
+    "devcontainer_host_guidance": true
+  },
+  "terminal_review_arrow_keys_and_cancel": true,
+  "limitations": [
+    "Full interactive Windows sessions not manually tested",
+    "Linux Homebrew installation not tested",
+    "Full Docker and Dev Container ten-starter matrices remain historical; representative current checks passed"
+  ]
+}

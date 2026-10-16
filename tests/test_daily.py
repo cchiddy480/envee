@@ -281,3 +281,35 @@ def test_advanced_first_use_asks_each_ai_choice_once(tmp_path):
     assert result.output.count("Add CodeGraph?") == 1
     assert result.output.count("Add Ponytail?") == 1
     assert preferences.load() == {"codegraph": True, "ponytail": False}
+
+
+def test_setup_warning_exit_and_unverified_label(tmp_path, monkeypatch):
+    project(tmp_path / "project", codegraph=True)
+    monkeypatch.setattr(runner, "setup", lambda *a: None)
+    monkeypatch.setattr(agent_tools, "setup", lambda *a: ["CodeGraph: offline"])
+    for flags, label in [([], "Application ready—with warnings"),
+                         (["--skip-runtime"], "startup has not been verified")]:
+        result = CliRunner().invoke(main, ["setup", str(tmp_path / "project"), *flags])
+        assert result.exit_code == 3, result.output
+        assert label in result.output
+        if flags:
+            assert "Application ready" not in result.output
+
+
+def test_creation_can_offer_docker_without_writing_early(tmp_path, monkeypatch):
+    calls = []
+    def preflight(manifest, local):
+        assert not (tmp_path / "project").exists()
+        if local:
+            raise RuntimeError("Node 22 missing")
+    monkeypatch.setattr(runner, "preflight", preflight)
+    monkeypatch.setattr(runner, "prerequisite_problems", lambda *a: [])
+    monkeypatch.setattr(runner, "setup", lambda root, manifest, local: calls.append(local))
+    monkeypatch.setattr(agent_tools, "setup", lambda *a: [])
+    preferences.save({"codegraph": False, "ponytail": False})
+    result = CliRunner().invoke(main, ["init", str(tmp_path / "project"), "--preset", "web", "--no-git"],
+                                input="1\ny\nn\n")
+    assert result.exit_code == 0, result.output
+    assert calls == [False]
+    assert runner.load(tmp_path / "project")["environment"] == "docker"
+    assert "Node 22 missing" in result.output

@@ -1,4 +1,31 @@
-# Envee 0.2.0 validation
+# Envee 0.3.0 validation
+
+Verified on 16 October 2026.
+
+- 140 contract tests pass locally, covering context-aware launch, Git-boundary discovery,
+  invalid manifests, remembered AI preferences, per-project overrides, previews, safe retries,
+  aggregate diagnostics, optional-tool warning exits and foreground lifecycle handling.
+- All ten local starters pass fresh installation, builds, selected checks, real startup
+  verification and repeated setup on macOS Apple Silicon.
+- Real local and Docker Flask development report health URLs only after readiness,
+  stop on Ctrl+C, release their ports and leave no managed Docker services running.
+- Dev Container host commands give the VS Code reopening workflow. Container setup
+  and checks run in a real generated image.
+- Fresh source launcher and wheel installs pass. Fresh teammate setup from a subdirectory
+  preserves application files and local settings. Docker and Dev Container CLI creation
+  and checks pass. Packaged Ponytail assets are present when selected.
+- The real terminal review menu supports arrow keys, Create / Customise / Cancel,
+  and cancellation without creating a project.
+
+Release evidence is in [validation/envee-0.3.0.json](validation/envee-0.3.0.json).
+The [release CI workflow](https://github.com/cchiddy480/envee/actions) runs contracts on
+macOS, Linux and Windows with Python 3.12 and 3.14, plus all ten local starters on Linux.
+
+Full runtime management, additional stacks and arbitrary-repository adoption remain
+outside this release. Full interactive Windows sessions and Linux Homebrew installation
+are not covered by the macOS acceptance run.
+
+## Previous release: Envee 0.2.0
 
 Verified on 15 October 2026.
 

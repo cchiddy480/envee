@@ -51,9 +51,9 @@ def main():
             checkout / "src/envee_bootstrap",
             ignore=shutil.ignore_patterns("__pycache__"),
         )
+        os.environ["XDG_CONFIG_HOME"] = str(temporary / "config")
         environment = os.environ.copy()
         environment["ENVEE_PYTHON"] = sys.executable
-        environment["XDG_CONFIG_HOME"] = str(temporary / "config")
         assert "0.3.0" in command(["bash", str(checkout / "envee"), "--version"], checkout, environment)
         project = temporary / "new-project"
         project.mkdir()
@@ -74,6 +74,12 @@ def main():
         source = (project / "app/main.py").read_bytes()
         command([str(checkout / ".venv/bin/envee"), "setup", str(project)], project)
         assert (project / "app/main.py").read_bytes() == source
+        teammate = temporary / "teammate"
+        shutil.copytree(project, teammate, ignore=shutil.ignore_patterns(".venv", ".git", ".envee", "__pycache__"))
+        command([str(checkout / ".venv/bin/envee"), "setup"], teammate / "app")
+        assert (teammate / "app/main.py").read_bytes() == source
+        assert (teammate / ".env").read_text() == "PLACEHOLDER=true\n"
+        assert (teammate / "local.settings.json").read_text() == "{}\n"
         assert "Hello, team!" in command(
             [str(project / ".venv/bin/acceptance-tool"), "--name", "team"], project
         )
@@ -110,12 +116,14 @@ def main():
                 "--yes",
                 "--preset",
                 "fullstack-fastapi",
+                "--ponytail",
                 "--no-install",
                 "--no-git",
             ],
             temporary,
         )
         assert (preview / "scripts/project.py").is_file()
+        assert (preview / ".agents/skills/ponytail/SKILL.md").is_file()
         result = {
             "passed": True,
             "fresh_launcher_install": True,
@@ -123,6 +131,7 @@ def main():
             "verified_cli_project": True,
             "git_and_secret_exclusions": True,
             "retry_preserves_source": True,
+            "fresh_teammate_setup_preserves_source_and_settings": True,
             "installed_project_command": True,
             "web_init_ready_with_existing_runtime": True,
             "original_node_version": active_node,

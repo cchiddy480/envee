@@ -14,6 +14,7 @@ from envee_bootstrap.templates import render
 def main():
     fixture = Path(__file__).resolve().parents[1] / "tests/fixtures/python-lock/requirements.lock"
     original = fixture.read_bytes()
+    original_text = fixture.read_text(encoding="utf-8")
     with tempfile.TemporaryDirectory(prefix="envee-portable-lock-") as temporary:
         root = Path(temporary) / "project"
         write_files(root, render(Options(name="portable-lock", preset="flask", git=False,
@@ -28,7 +29,7 @@ def main():
         assert (root / "requirements.lock").read_bytes() == original
         corrupt = root / "corrupt.lock"
         corrupt.write_text(re.sub(r"sha256:[a-f0-9]{64}", "sha256:" + "0" * 64,
-                                  original.decode("utf-8")), encoding="utf-8")
+                                  original_text), encoding="utf-8", newline="\n")
         result = subprocess.run([runner.python(root), "-m", "pip", "install", "--ignore-installed",
                                  "--no-cache-dir", "--require-hashes", "-r", str(corrupt)],
                                 cwd=root, text=True, capture_output=True, timeout=180)
@@ -37,7 +38,7 @@ def main():
         assert (root / "requirements.lock").read_bytes() == original
         runner.python_lock = original_resolver
         runner.python_lock(root)
-        before = re.findall(r"^[a-z][^\n]*==[^\n]*", original.decode("utf-8"), re.MULTILINE)
+        before = re.findall(r"^[a-z][^\n]*==[^\n]*", original_text, re.MULTILINE)
         after = re.findall(r"^[a-z][^\n]*==[^\n]*", (root / "requirements.lock").read_text(), re.MULTILINE)
         assert before == after, "Refresh upgraded compatible pins"
         assert not runner.locking_problems(root, manifest)

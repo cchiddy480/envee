@@ -2,11 +2,11 @@
 
 Verified on 21 October 2026.
 
-- 173 local contracts pass, including strict recipe validation and precedence, sharing,
+- 173 contracts pass on macOS, Linux and Windows with Python 3.12 and 3.14, including strict recipe validation and precedence, sharing,
   optional-action failures, lock preservation, malformed dependency files, stale inputs,
   interrupted setup records and existing daily-development behavior.
 - All ten local starters pass real installation, selected checks, startup verification
-  and repeated setup on macOS Apple Silicon with the new lock policy.
+  and repeated setup on macOS Apple Silicon and hosted Linux with the new lock policy.
 - Real Docker Flask and full-stack FastAPI projects pass installation, builds, selected
   checks and live readiness, including the frontend-to-backend proxy. A generated
   Dev Container passes actual Python setup and startup inside its image.
@@ -18,8 +18,14 @@ Verified on 21 October 2026.
   the Forge manifest path and original standalone runner also work without migration.
 
 Release-specific evidence: [validation/envee-0.4.0.json](validation/envee-0.4.0.json).
-The hosted matrix runs contracts and the same committed universal Python lock on macOS,
-Linux and Windows, with Python 3.12 and 3.14, plus all ten starters on Linux.
+The [hosted contract and shared-lock checks](https://github.com/cchiddy480/envee/actions/runs/39587687258)
+pass across the six OS/Python combinations, including real installation, incorrect-hash rejection
+and explicit lock refresh retaining compatible pins. The [Linux ten-starter matrix](https://github.com/cchiddy480/envee/actions/runs/39587001828)
+also passes.
+
+Homebrew source installation, formula style and formula tests pass on Apple Silicon.
+A real terminal session using Homebrew Python verifies application creation, the recipe-save
+prompt and arrow-key selection of the saved setup; previewing that recipe creates no project.
 
 Full interactive Windows sessions and Linux Homebrew installation are not manually covered.
 Dependency locks do not freeze OS packages, image digests or the full build toolchain.

@@ -150,5 +150,34 @@
     "Full interactive Windows sessions not manually tested",
     "Linux Homebrew installation not tested",
     "Locks do not freeze OS packages, container image digests or the full build toolchain"
-  ]
+  ],
+  "ci_contracts": {
+    "passed": true,
+    "tests": 173,
+    "operating_systems": [
+      "macOS",
+      "Linux",
+      "Windows"
+    ],
+    "python": [
+      "3.12",
+      "3.14"
+    ],
+    "shared_lock_install_hash_rejection_and_refresh": true,
+    "url": "https://github.com/cchiddy480/envee/actions/runs/39587687258"
+  },
+  "linux_starters": {
+    "passed": true,
+    "presets": 10,
+    "url": "https://github.com/cchiddy480/envee/actions/runs/39587001828"
+  },
+  "homebrew": {
+    "source_install": true,
+    "formula_style": true,
+    "formula_test": true,
+    "verified_project_using_homebrew_python": true,
+    "terminal_recipe_save": true,
+    "terminal_arrow_key_selection": true,
+    "recipe_preview_does_not_create_project": true
+  }
 }

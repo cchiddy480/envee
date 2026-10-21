@@ -207,3 +207,11 @@ def test_python_edit_during_resolution_preserves_old_lock(tmp_path, monkeypatch)
     with pytest.raises(RuntimeError, match="changed while"):
         runner.python_lock(tmp_path)
     assert (tmp_path / "requirements.lock").read_bytes() == before
+
+
+def test_read_only_flag_cannot_accidentally_run_setup(monkeypatch):
+    monkeypatch.setattr(sys, "argv", ["project.py", "setup", "--check"])
+    monkeypatch.setattr(runner, "setup", lambda *a: pytest.fail("installation"))
+    with pytest.raises(SystemExit) as exc:
+        runner.main()
+    assert exc.value.code == 2

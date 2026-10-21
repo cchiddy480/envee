@@ -1,4 +1,30 @@
-# Envee 0.3.0 validation
+# Envee 0.4.0 validation
+
+Verified on 21 October 2026.
+
+- 173 local contracts pass, including strict recipe validation and precedence, sharing,
+  optional-action failures, lock preservation, malformed dependency files, stale inputs,
+  interrupted setup records and existing daily-development behavior.
+- All ten local starters pass real installation, selected checks, startup verification
+  and repeated setup on macOS Apple Silicon with the new lock policy.
+- Real Docker Flask and full-stack FastAPI projects pass installation, builds, selected
+  checks and live readiness, including the frontend-to-backend proxy. A generated
+  Dev Container passes actual Python setup and startup inside its image.
+- Fresh launcher and wheel installation pass, including the interactive wizard,
+  shared recipe files, source-only creation and packaged Ponytail assets.
+- Fresh teammate setup preserves the original Python lock without invoking the resolver,
+  and preserves source and local settings. A corrupted lock fails pip hash verification.
+- A real 0.3-generated project retains schema 1, its original files and dependency workflow;
+  the Forge manifest path and original standalone runner also work without migration.
+
+Release-specific evidence: [validation/envee-0.4.0.json](validation/envee-0.4.0.json).
+The hosted matrix runs contracts and the same committed universal Python lock on macOS,
+Linux and Windows, with Python 3.12 and 3.14, plus all ten starters on Linux.
+
+Full interactive Windows sessions and Linux Homebrew installation are not manually covered.
+Dependency locks do not freeze OS packages, image digests or the full build toolchain.
+
+## Previous release: Envee 0.3.0
 
 Verified on 16 October 2026.
 

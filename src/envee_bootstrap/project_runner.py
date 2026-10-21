@@ -814,6 +814,8 @@ def main():
     parser.add_argument("--local", action="store_true", help="Use local tools instead of Docker.")
     parser.add_argument("--skip-runtime", action="store_true", help="Skip live startup (useful in CI).")
     args = parser.parse_args()
+    if args.check and args.action != "lock":
+        parser.error("--check is only valid with the lock action")
     root = Path(__file__).resolve().parents[1]
     try:
         manifest = load(root)

@@ -1,0 +1,154 @@
+{
+  "version": "0.4.0",
+  "verified_on": "2026-10-21",
+  "local_contracts": {
+    "passed": true,
+    "tests": 173
+  },
+  "local_starters": [
+    {
+      "preset": "web",
+      "environment": "local",
+      "minimal_options": false,
+      "passed": true,
+      "files_sha256": "e502c7175017fd0c12df283039cb0a6223d1e92cd1b889d0e9d69de003b638d5",
+      "seconds": 28.11
+    },
+    {
+      "preset": "flask",
+      "environment": "local",
+      "minimal_options": false,
+      "passed": true,
+      "files_sha256": "3bd74529d35d75f54f1d73b48b0ee994fc975a7580493caa0447c2cfe2840f2e",
+      "seconds": 15.65
+    },
+    {
+      "preset": "fastapi",
+      "environment": "local",
+      "minimal_options": false,
+      "passed": true,
+      "files_sha256": "8df8aeb0e4b06995ea6b1aa043a887495cb9be9ea580182889dbafcef326f534",
+      "seconds": 16.64
+    },
+    {
+      "preset": "azure",
+      "environment": "local",
+      "minimal_options": false,
+      "passed": true,
+      "files_sha256": "a32f9052ee1931403de6b4d6a80873de396bf4662e96d66bf1f6863cf0d93829",
+      "seconds": 11.32
+    },
+    {
+      "preset": "fullstack-flask",
+      "environment": "local",
+      "minimal_options": false,
+      "passed": true,
+      "files_sha256": "7ae2b844c397e32141d37ca341f5661e4a03588b011b655cd77a6e3324818b8b",
+      "seconds": 28.4
+    },
+    {
+      "preset": "fullstack-fastapi",
+      "environment": "local",
+      "minimal_options": false,
+      "passed": true,
+      "files_sha256": "41817e17d09d6e64561dfec69c9f354b9ef5c42a348e35fb41bd53e10969564c",
+      "seconds": 29.25
+    },
+    {
+      "preset": "fullstack-azure",
+      "environment": "local",
+      "minimal_options": false,
+      "passed": true,
+      "files_sha256": "c41930c16196ebb605c31b7c0a1b1fcba56eb5cf350db81196b11e416b98a8fd",
+      "seconds": 24.48
+    },
+    {
+      "preset": "cli",
+      "environment": "local",
+      "minimal_options": false,
+      "passed": true,
+      "files_sha256": "82b2fbef1382a8f2bcd4b200c963538710b9c7407dd53dfd1c89c59277130138",
+      "seconds": 10.64
+    },
+    {
+      "preset": "python",
+      "environment": "local",
+      "minimal_options": false,
+      "passed": true,
+      "files_sha256": "0cfedb49bc0470be32cbea1b39f0776488cefdfda0e9d4ba94ecb16f50d60044",
+      "seconds": 8.19
+    },
+    {
+      "preset": "typescript",
+      "environment": "local",
+      "minimal_options": false,
+      "passed": true,
+      "files_sha256": "1f033136cf85c7b9807d4c3f58a1b88633beeb90a4587ac8d7a96595afa2a333",
+      "seconds": 7.38
+    }
+  ],
+  "containers": {
+    "flask_docker": [
+      {
+        "preset": "flask",
+        "environment": "docker",
+        "minimal_options": false,
+        "passed": true,
+        "files_sha256": "0e8a7c615b273b34544aa771b1c6b0fa7764db75b70d75f30c6cdb654aad4ea5",
+        "seconds": 38.03
+      }
+    ],
+    "fullstack_fastapi_docker": [
+      {
+        "preset": "fullstack-fastapi",
+        "environment": "docker",
+        "minimal_options": false,
+        "passed": true,
+        "files_sha256": "7963440c464c61f7c11d8f79ffc76d24a4618ef8cf8ab7ed522e9f655aea6823",
+        "seconds": 94.76
+      }
+    ],
+    "python_devcontainer": [
+      {
+        "preset": "python",
+        "environment": "devcontainer",
+        "minimal_options": false,
+        "passed": true,
+        "files_sha256": "e713ec7e6a302bea820ca6514991f265e874f8adbecfb79325b969f777a8e9fb",
+        "seconds": 78.57
+      }
+    ]
+  },
+  "fresh_install_acceptance": {
+    "passed": true,
+    "fresh_launcher_install": true,
+    "real_interactive_wizard": true,
+    "verified_cli_project": true,
+    "git_and_secret_exclusions": true,
+    "recipe_file_sharing": true,
+    "retry_and_teammate_setup_preserve_locks": true,
+    "teammate_reuses_lock_without_resolver": true,
+    "retry_preserves_source": true,
+    "fresh_teammate_setup_preserves_source_and_settings": true,
+    "installed_project_command": true,
+    "web_init_ready_with_existing_runtime": true,
+    "original_node_version": "v26.12.0",
+    "parent_shell_runtime_unchanged": true,
+    "wheel_install_and_generation": true,
+    "docker_cli_init_and_check": true,
+    "devcontainer_cli_init_and_check": true
+  },
+  "legacy_compatibility": {
+    "original_0_3_project": true,
+    "schema_1_setup_unchanged": true,
+    "forge_manifest_supported": true,
+    "source_manifest_and_local_settings_preserved": true,
+    "old_standalone_runner_still_works": true,
+    "no_automatic_lock_migration": true
+  },
+  "limitations": [
+    "Full interactive Windows sessions not manually tested",
+    "Linux Homebrew installation not tested",
+    "Locks do not freeze OS packages, container image digests or the full build toolchain"
+  ]
+}

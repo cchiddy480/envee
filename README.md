@@ -66,7 +66,7 @@ envee init
 
 Windows: use `py -3.12 -m venv .venv`, `.venv\Scripts\python -m pip install .`
 and `.venv\Scripts\Activate.ps1`. Generated projects use `python scripts/project.py` on Windows.
-The Windows helper is a preview; this release was validated on macOS and Linux containers.
+The Windows helper remains a preview; platform validation is recorded in `VALIDATION.md`.
 
 ## Launch choices
 
@@ -82,6 +82,36 @@ CI and databases are off. Customise or `--advanced` exposes execution mode, tool
 SQLite for Python APIs, preserving your earlier answers. `--default` remains supported.
 Explicit flags override saved preferences. `--yes` is completely noninteractive.
 After verified interactive creation, Envee offers **Start now**.
+
+### Saved setups and team recipes
+
+Save a working project's choices, then reuse them by name:
+
+```sh
+envee recipe save my-api ./my-project
+envee recipe list
+envee recipe show my-api
+envee init ./next-project --recipe my-api
+```
+
+Successful interactive creation offers to save a new or customised setup before starting it.
+Unchanged recipe-based creation skips that offer. Previews, automation and source-only
+creation never offer to save. Saved recipes appear alongside project types in the first menu.
+
+Share a recipe file through your existing team Git repository:
+
+```sh
+envee recipe save team-api ./my-project --output ./team-api.json
+envee init ./new-service --recipe ./team-api.json --no-ci
+```
+
+Recipes contain validated stack/tool/database choices, without application files, credentials,
+project names, dependency locks, AI preferences or executable hooks. Explicit flags override recipe
+choices; AI tools keep each developer's personal preferences and flags. Recipes use the current
+Envee starters, so they do not freeze future template or dependency versions. Remote fetching is
+not supported. Personal recipes live in `envee/recipes/` beside the user configuration file.
+Existing recipes require `--force` to replace. `envee recipe remove NAME` removes a personal recipe
+with confirmation; `--yes` supports automation. Shared files and project files stay untouched.
 
 ### Agent tools
 
@@ -155,13 +185,39 @@ runs selected lint and tests, then starts the generated app and verifies its HTT
 Full-stack checks include the frontend-to-backend proxy. CLI/minimal projects are executed.
 Startup smoke checks stop their processes afterwards. Occupied ports cause a clear failure.
 
-Python uses per-component `.venv` environments and pip. Node projects use the Node 22.x line
-(22.13+) and npm. The first install creates `package-lock.json`; subsequent installs use `npm ci`.
-If another Node version is active, Envee selects an installed Node 22 from nvm for its own
-processes. It does not change your shell or download a runtime silently.
-Docker mode resolves lockfiles inside Node containers, builds images, runs checks inside them,
-and verifies live startup. Dev Container mode also supplies an image with Python and Node;
-VS Code performs setup inside that container when you open it.
+New 0.4 projects use manifest schema 2 and dependency locking. Existing Envee and legacy
+Forge projects keep schema 1 and their original dependency workflow; no automatic migration runs.
+The new CLI reads both schemas. Older CLIs need upgrading to handle new projects; the generated
+standalone runner continues to work without Envee.
+
+Python keeps per-component `.venv` environments and pip. Runtime and selected development
+dependencies live in `pyproject.toml`; initial setup resolves a universal `requirements.lock`
+with package hashes using pinned uv 0.13.4. The resolver is installed into a temporary tool
+environment and removed afterwards. It never downloads a Python runtime or enters your app's
+dependency list. Pip installs locked dependencies with hash verification, then installs the
+application without re-resolving its dependencies. `requirements.txt` references that lock.
+
+Commit `requirements.lock` and Node's `package-lock.json`. Retries reuse existing locks; changed
+Python dependency declarations stop with a remedy instead of quietly resolving new versions.
+After editing dependencies, run:
+
+```sh
+envee lock ./my-project
+envee setup ./my-project
+envee lock ./my-project --check
+```
+
+`lock --check` and doctor validate without writes or downloads. Lock refresh preserves compatible
+existing pins and replaces files atomically after successful resolution. Node refresh uses a
+lockfile-only operation without lifecycle scripts; normal Node setup still uses `npm ci`.
+These locks cover declared dependencies, without pruning manually installed extras or freezing
+OS packages, container image digests or the full build toolchain. Source-only projects generate
+missing locks when setup runs; generated CI requires committed, current locks before installation.
+
+Node projects use Node 22.x (22.13+) and npm. If another version is active, Envee selects an
+installed Node 22 from nvm for its own processes without changing your shell. Docker generates
+missing locks using container tools before building application images, then consumes those
+same locks. Dev Containers perform setup inside their image with Python and Node available.
 
 `envee dev` runs local or Docker development in the foreground, reports verified service
 URLs and cleans up managed processes on Ctrl+C or failure. CLI/minimal projects run
@@ -169,10 +225,16 @@ once. Dev Containers keep the VS Code reopening workflow with direct host guidan
 `envee doctor` reports prerequisite problems together, with remedies; it never installs
 runtimes or changes an existing project's execution mode.
 
-If application verification passes but an optional AI tool fails, Envee reports
-**Application ready—with warnings**, names the failure and gives an `envee setup` retry.
-Exit codes: **0** success, **1** required failure, **2** usage error, **3** optional-tool
+If application verification passes but an optional AI tool or recipe save fails, Envee reports
+**Application ready—with warnings**, names the failure and gives the relevant retry command.
+Exit codes: **0** success, **1** required failure, **2** usage error, **3** optional-action
 failure after application checks. Skipped startup is always labelled unverified.
+
+Setup records completed, failed/interrupted and pending stages in ignored `.envee/setup-state.json`
+(legacy `.forge/`). Home and doctor explain an incomplete previous setup. This record is advisory:
+retries reuse locks, environments and package caches, then rerun installation and verification.
+No phase is skipped based on a past success. Progress records contain stage status and a local
+log reference, without credentials or environment values.
 
 If setup fails, source remains in place. Fix the reported prerequisite or download issue,
 then run `envee setup PATH`. Each generated project includes a standalone standard-library
@@ -182,9 +244,11 @@ runner, so teammates do not need Envee installed to set up, check or run it:
 python3 scripts/project.py setup
 python3 scripts/project.py check
 python3 scripts/project.py dev
+python3 scripts/project.py lock
+python3 scripts/project.py lock --check
 ```
 
-CI uses `--local --skip-runtime` and explicitly reports that live startup was skipped.
+CI checks dependency locks first, then uses `--local --skip-runtime` and explicitly reports that live startup was skipped.
 For local development, API ports are 8000 (Python) or 7071 (Azure), and frontend is 5173.
 Docker binds exposed ports to localhost. Docker images need rebuilding after source changes;
 local development supports the frontend's normal hot reload.

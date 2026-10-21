@@ -1,6 +1,7 @@
 """Daily CLI contracts: preferences, discovery, recovery and owned processes."""
 
 import os
+import re
 import socket
 import subprocess
 import sys
@@ -17,7 +18,12 @@ from envee_bootstrap.templates import render
 
 def project(path, **options):
     write_files(path, render(Options(name="example", preset="python", git=False, **options)))
-    return runner.load(path)
+    manifest = runner.load(path)
+    for component in manifest["components"]:
+        if component["kind"] in runner.PYTHON_KINDS:
+            cwd = path / component["path"]
+            (cwd / "requirements.lock").write_text("# envee-input-sha256: " + runner.dependency_fingerprint(cwd) + "\n")
+    return manifest
 
 
 def test_discovery_legacy_invalid_and_git_boundaries(tmp_path):
@@ -44,7 +50,7 @@ def test_home_empty_and_unrelated_folder(tmp_path, monkeypatch):
     (tmp_path / "existing.txt").write_text("preserve")
     result = CliRunner().invoke(main, [], input="1\nchild\n5\n1\nn\nn\n3\n")
     assert result.exit_code == 0, result.output
-    assert "Project      child" in result.output
+    assert re.search(r"Project\s+child", result.output)
     assert (tmp_path / "existing.txt").read_text() == "preserve"
     assert not (tmp_path / "child").exists()
 
@@ -309,7 +315,7 @@ def test_creation_can_offer_docker_without_writing_early(tmp_path, monkeypatch):
     monkeypatch.setattr(agent_tools, "setup", lambda *a: [])
     preferences.save({"codegraph": False, "ponytail": False})
     result = CliRunner().invoke(main, ["init", str(tmp_path / "project"), "--preset", "web", "--no-git"],
-                                input="1\ny\nn\n")
+                                input="1\ny\nn\nn\n")
     assert result.exit_code == 0, result.output
     assert calls == [False]
     assert runner.load(tmp_path / "project")["environment"] == "docker"

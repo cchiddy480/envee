@@ -46,7 +46,7 @@ def test_new_brand_and_version(tmp_path):
     assert result.exit_code == 0, result.output
     assert "ENVEE" in result.output and "FORGE" not in result.output
     manifest = json.loads((tmp_path / "brand/envee.json").read_text())
-    assert manifest["envee_version"] == "0.3.0"
+    assert manifest["envee_version"] == "0.4.0"
 
 
 @pytest.mark.parametrize("keys,expected", [(["\x1b[B", "\r"], "b"), (["\x1b[A", "\r"], "c"), (["2", "\r"], "b")])

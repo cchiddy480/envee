@@ -35,7 +35,7 @@ def python_files(o: Options):
         deps.append("pytest==9.1.1")
         if kind == "fastapi":
             deps.append("httpx==0.28.1")
-    f = {"requirements.txt": "\n".join(deps) + "\n", "app/__init__.py": ""}
+    f = {"requirements.txt": "--require-hashes\n-r requirements.lock\n", "app/__init__.py": ""}
     if kind == "flask":
         f["app/main.py"] = text('''
             """HTTP API starter."""
@@ -148,6 +148,9 @@ def python_files(o: Options):
         version = "0.1.0"
         requires-python = ">=3.12"
         dependencies = {json.dumps(runtime_dependencies)}
+
+        [project.optional-dependencies]
+        dev = {json.dumps([dep for dep in deps if dep not in runtime_dependencies])}
 
         [tool.setuptools.packages.find]
         include = ["app*"]
@@ -567,7 +570,7 @@ def render(o: Options):
         path = "frontend" if o.fullstack else "."
         components.append({"path": path, "kind": "web"})
         f.update({(Path(path) / k).as_posix(): v for k, v in node_files(o, "web").items()})
-    manifest = {"schema": 1, "envee_version": __version__, **asdict(o), "components": components}
+    manifest = {"schema": 2, "envee_version": __version__, **asdict(o), "components": components}
     f["envee.json"] = js(manifest)
     f["scripts/project.py"] = Path(__file__).with_name("project_runner.py").read_text()
     f[".gitignore"] = text("""
@@ -679,6 +682,7 @@ def render(o: Options):
                   - uses: actions/setup-node@v4
                     with:
                       node-version: '22'
+                  - run: python3 scripts/project.py lock --check
                   - run: python3 scripts/project.py setup --local --skip-runtime
         """)
     f["README.md"] = readme(o, components)
@@ -697,7 +701,7 @@ def container_files(f, o, components):
         if kind == "azure":
             dockerfile += "RUN apt-get update && apt-get install -y --no-install-recommends libicu72 libssl3 ca-certificates && rm -rf /var/lib/apt/lists/*\nRUN npm install -g azure-functions-core-tools@4 --unsafe-perm true\n"
         if python:
-            dockerfile += 'RUN python -m venv .venv\nENV PATH="/workspace/.venv/bin:$PATH"\nCOPY requirements.txt .\nRUN pip install --no-cache-dir -r requirements.txt\nCOPY . .\nRUN pip install --no-cache-dir -e .\n'
+            dockerfile += 'RUN python -m venv .venv\nENV PATH="/workspace/.venv/bin:$PATH"\nCOPY requirements.txt requirements.lock .\nRUN pip install --no-cache-dir --require-hashes -r requirements.txt\nCOPY . .\nRUN pip install --no-cache-dir --no-deps -e .\n'
         else:
             dockerfile += "COPY package*.json .\nRUN npm ci\nCOPY . .\nRUN npm run build\n"
         if kind == "azure":
@@ -826,9 +830,21 @@ def readme(o, components):
         {"Web: http://localhost:5173. " if o.has_web else ""}{"API: http://localhost:" + ("7071" if o.backend == "azure" else "8000") + "/api/health." if o.backend in {"flask", "fastapi", "azure"} else ""}
         {"The frontend proxies /api to the backend; use the frontend URL." if o.fullstack else ""}
 
+        ## Dependency locks
+
+        Commit requirements.lock for Python components and package-lock.json for Node components.
+        Python dependencies are declared in pyproject.toml, including the dev optional-dependency group.
+        Initial setup generates missing locks; retries reuse them. After editing dependencies, run
+        `python3 scripts/project.py lock` (or `envee lock`), review the changes, then rerun setup.
+        `python3 scripts/project.py lock --check` validates locks without downloads or writes.
+        Python lock generation downloads pinned uv into a temporary tool environment; Python runtimes
+        are never downloaded. Application environments still use pip. Source-only projects need setup
+        before their locks exist. Docker builds consume the same locks; run setup before building images.
+        Locks cover declared dependencies, without pruning manually installed extras or freezing OS/build tools.
+
         ## Project conventions
 
-        {"Python dependencies live in requirements.txt and an isolated .venv in each Python component." if o.has_python else ""}
+        {"Python dependencies live in pyproject.toml and an isolated .venv in each Python component." if o.has_python else ""}
         {"Commit package-lock.json; setup uses npm ci when it exists." if o.has_node else ""}
         {"The installed Python CLI command is " + o.name + " (activate .venv first), or use python3 scripts/project.py dev." if o.backend == "cli" else ""}
         {"SQLite is wired through app/database.py; its check creates data/app.db. Set DATABASE_URL to override the default." if o.database == "sqlite" else ""}

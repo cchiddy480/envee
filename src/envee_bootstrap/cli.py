@@ -17,7 +17,7 @@ from rich.text import Text
 from . import __version__
 from .model import Options, PRESETS
 from . import project_runner as runner
-from . import agent_tools, preferences
+from . import agent_tools, preferences, recipes
 from .templates import render
 
 console = Console(highlight=False)
@@ -61,6 +61,7 @@ def progress(root, action):
     logs.mkdir(exist_ok=True)
     path = logs / f"{action}.log"
     original_run, original_output = runner.run, runner.OUTPUT_STREAM
+    original_stage = runner.STAGE_CALLBACK
     terminal = Console(file=console.file, highlight=False)
     with path.open("w", encoding="utf-8") as stream:
         with terminal.status(f"{action.capitalize()} · preparing your environment", spinner="dots") as status:
@@ -82,17 +83,19 @@ def progress(root, action):
                 original_run(args, cwd, timeout)
                 status.update("Verifying startup and finishing checks")
             runner.run, runner.OUTPUT_STREAM = run, stream
+            runner.STAGE_CALLBACK = lambda name: status.update(f"{action.capitalize()} · {name}")
             try:
                 with redirect_stdout(stream):
                     yield
             except BaseException:
                 stream.flush()
-                console.print(f"\nSetup stopped. Details: {path}", style="yellow", markup=False)
+                console.print(f"\n{action.capitalize()} stopped. Details: {path}", style="yellow", markup=False)
                 tail = path.read_text(encoding="utf-8", errors="replace").splitlines()[-12:]
                 console.print("\n".join(tail), markup=False)
                 raise
             finally:
                 runner.run, runner.OUTPUT_STREAM = original_run, original_output
+                runner.STAGE_CALLBACK = original_stage
     console.print(f"✓ {action.capitalize()} completed", style="green")
     console.print(f"Details saved to {path}", style="dim", markup=False)
 
@@ -106,6 +109,7 @@ def wizard_preset():
             ("fullstack", "Full-stack application"),
             ("cli", "CLI tool"),
             ("minimal", "Minimal project"),
+            *[("recipe:" + name, "Saved setup · " + name) for name in recipes.names()],
         ],
     )
     if kind in {"api", "fullstack"}:
@@ -136,6 +140,7 @@ def main(ctx):
             manifest = runner.load(root)
             console.print(Panel(f"{manifest['name']}\n{PRESETS[manifest['preset']]}\n"
                                 f"Runs: {manifest['environment']}", title="ENVEE"), markup=False)
+            show_previous_setup(root)
             action = choose("What next?", [("dev", "Start development"), ("check", "Check project"),
                             ("doctor", "Diagnose prerequisites"), ("setup", "Retry setup"),
                             ("exit", "Exit")])
@@ -169,6 +174,7 @@ def list_presets():
 @click.argument("directory", type=click.Path(path_type=Path), default=".")
 @click.option("--name", help="Project name: lowercase words separated by hyphens.")
 @click.option("--preset", type=click.Choice(list(PRESETS)))
+@click.option("--recipe", "recipe_reference", help="Use a personal recipe name or local JSON file.")
 @click.option("--environment", type=click.Choice(["local", "docker", "devcontainer"]))
 @click.option("--advanced/--default", "advanced", default=None,
               help="Choose individual tools, or use the recommended development tools.")
@@ -186,7 +192,7 @@ def list_presets():
 @click.option("--dry-run", is_flag=True, help="Preview files and choices without writing or installing.")
 def init(
     directory, name, preset, environment, advanced, git, lint, tests, ci, editor, env,
-    codegraph, ponytail, database, install, yes, dry_run
+    codegraph, ponytail, database, install, yes, dry_run, recipe_reference
 ):
     """Turn an empty DIRECTORY into a ready-to-code project."""
     target = directory.absolute()
@@ -204,10 +210,23 @@ def init(
             name = default_name
         except ValueError:
             name = click.prompt("Project name", default="my-project") if interactive else "my-project"
-    if preset is None:
-        preset = wizard_preset() if interactive else "python"
-    environment = environment or "local"
-    database = database or "none"
+    recipe_values = {}
+    selected_recipe = None
+    try:
+        if recipe_reference:
+            selected_recipe = recipes.load(recipe_reference)
+        if preset is None and selected_recipe is None:
+            preset = wizard_preset() if interactive else "python"
+            if preset.startswith("recipe:"):
+                selected_recipe = recipes.load(preset.removeprefix("recipe:"))
+                preset = None
+        if selected_recipe:
+            recipe_values = selected_recipe["options"].copy()
+        preset = preset or recipe_values.get("preset", "python")
+    except ValueError as exc:
+        raise click.BadParameter(str(exc), param_hint="--recipe") from exc
+    environment = environment or recipe_values.get("environment", "local")
+    database = database or recipe_values.get("database", "none")
     try:
         saved = preferences.load()
     except ValueError as exc:
@@ -222,7 +241,8 @@ def init(
         "codegraph": (codegraph, saved.get("codegraph", False), "Add CodeGraph?"),
         "ponytail": (ponytail, saved.get("ponytail", False), "Add Ponytail?"),
     }
-    values = {key: default if value is None else value for key, (value, default, _) in choices.items()}
+    values = {key: recipe_values.get(key, default) if value is None else value
+              for key, (value, default, _) in choices.items()}
     remembered = dict(saved)
     if interactive:
         for key in ("codegraph", "ponytail"):
@@ -272,6 +292,8 @@ def init(
             enabled = [labels[key] for key, enabled in values.items() if enabled]
             table.add_row("Tools", ", ".join(enabled) or "None")
             table.add_row("Database", database)
+            if options.has_python:
+                table.add_row("Python locks", f"uv {runner.UV_VERSION} · temporary resolver download during setup")
             console.print(Panel(table, title="Your project", border_style="cyan"))
             if dry_run or not interactive:
                 break
@@ -319,8 +341,8 @@ def init(
         warnings = []
         if install:
             with progress(target, "setup"):
-                runner.setup(target, manifest, environment == "local")
-                warnings = agent_tools.setup(target, manifest) or []
+                tracker = runner.setup(target, manifest, environment == "local")
+                warnings = setup_optional(target, manifest, tracker)
             report_ready(target, warnings)
         else:
             console.print(
@@ -334,6 +356,24 @@ def init(
             console.print("Next: open in VS Code → Dev Containers: Reopen in Container")
         else:
             console.print("Start: envee dev")
+        if install and interactive and recipes.choices(options) != recipe_values:
+            if click.confirm("Save this setup for next time?", default=False):
+                while True:
+                    recipe_name = click.prompt("Recipe name", default=preset)
+                    try:
+                        path = recipes.save(recipe_name, recipes.choices(options))
+                        console.print(f"Recipe saved: {path}", markup=False)
+                        break
+                    except ValueError as exc:
+                        console.print(str(exc), markup=False, style="yellow")
+                        if not click.confirm("Choose another recipe name?", default=True):
+                            break
+                    except OSError as exc:
+                        warning = (f"Recipe was not saved: {exc}. Retry with envee recipe save NAME "
+                                   + shlex.quote(str(target)))
+                        warnings.append(warning)
+                        report_ready(target, [warning])
+                        break
         if install and interactive and click.confirm("Start now?", default=False):
             existing_project(target, "dev", False, False)
         if warnings:
@@ -381,10 +421,19 @@ def existing_project(directory, action, local, skip_runtime):
                 console.print("\nStopped.")
             return
         warnings = []
+        if manifest["schema"] == 2 and action in {"setup", "lock"} and any(
+            c["kind"] in runner.PYTHON_KINDS and (action == "lock" or
+            not (root / c["path"] / "requirements.lock").exists()) for c in manifest["components"]
+        ):
+            console.print(f"Python locking downloads uv {runner.UV_VERSION} into a temporary tool environment. "
+                          "Python runtimes are not downloaded.", markup=False)
         with progress(root, action):
             if action == "setup":
-                runner.setup(root, manifest, use_local, skip_runtime)
-                warnings = agent_tools.setup(root, manifest) or []
+                tracker = runner.setup(root, manifest, use_local, skip_runtime)
+                warnings = setup_optional(root, manifest, tracker)
+            elif action == "lock":
+                runner.preflight(manifest, use_local, skip_runtime=True)
+                runner.lock(root, manifest, use_local)
             else:
                 runner.check(root, manifest, use_local, skip_runtime)
         if action == "setup":
@@ -441,6 +490,9 @@ def doctor(directory, preset, environment):
         use_local = manifest["environment"] == "local" or (
             manifest["environment"] == "devcontainer" and Path("/.dockerenv").exists())
         problems = runner.prerequisite_problems(manifest, use_local)
+        if root:
+            show_previous_setup(root)
+            problems += runner.locking_problems(root, manifest)
         if problems:
             raise RuntimeError("Prerequisite problems:\n- " + "\n- ".join(problems) +
                                "\nAfter fixing these, retry: envee doctor " + shlex.quote(str(root or directory)))
@@ -451,6 +503,111 @@ def doctor(directory, preset, environment):
     except click.exceptions.Exit:
         raise
     except (RuntimeError, OSError, ValueError) as exc:
+        raise click.ClickException(str(exc)) from exc
+
+
+def show_previous_setup(root):
+    lines = runner.previous_setup(root)
+    if lines:
+        console.print("Previous setup:", style="yellow")
+        for line in lines:
+            console.print("  " + line, markup=False)
+        console.print(f"Retry: envee setup {shlex.quote(str(root))}", markup=False)
+
+
+def setup_optional(root, manifest, tracker):
+    if not (manifest.get("codegraph") or manifest.get("ponytail")) or not tracker:
+        return agent_tools.setup(root, manifest) or []
+    with tracker.stage("Optional AI tools"):
+        warnings = agent_tools.setup(root, manifest) or []
+    if warnings:
+        tracker.state["stages"][-1]["status"] = "warning"
+        tracker.write()
+    return warnings
+
+
+@main.command()
+@click.argument("directory", type=click.Path(path_type=Path), default=".")
+@click.option("--local", is_flag=True)
+@click.option("--check", "check_only", is_flag=True, help="Validate locks without writing or downloading.")
+def lock(directory, local, check_only):
+    """Refresh project dependency locks after editing dependency declarations."""
+    if not check_only:
+        existing_project(directory, "lock", local, False)
+        return
+    try:
+        root = runner.discover(directory)
+        if root is None:
+            raise ValueError("No Envee project found.")
+        manifest = runner.load(root)
+        if manifest["schema"] != 2:
+            raise ValueError("Locking requires a new Envee 0.4 project; this project's setup is unchanged.")
+        problems = runner.locking_problems(root, manifest)
+        if problems:
+            raise ValueError("\n".join(problems))
+        console.print("✓ Dependency locks are current", style="green")
+    except (ValueError, RuntimeError, OSError, KeyError) as exc:
+        raise click.ClickException(str(exc)) from exc
+
+
+@main.group()
+def recipe():
+    """Save and share reusable setup choices."""
+
+
+@recipe.command("list")
+def recipe_list():
+    """List personal recipes."""
+    names = recipes.names()
+    for name in names:
+        console.print(name, markup=False)
+    if not names:
+        console.print("No saved recipes yet. Use envee recipe save NAME inside a project.")
+
+
+@recipe.command("show")
+@click.argument("reference")
+def recipe_show(reference):
+    """Show a personal recipe or local recipe file."""
+    try:
+        console.print(json.dumps(recipes.load(reference), indent=2), markup=False)
+    except (OSError, ValueError) as exc:
+        raise click.ClickException(str(exc)) from exc
+
+
+@recipe.command("save")
+@click.argument("name")
+@click.argument("directory", type=click.Path(path_type=Path), default=".")
+@click.option("--output", type=click.Path(path_type=Path), help="Write a shareable file instead of a personal recipe.")
+@click.option("--force", is_flag=True, help="Replace an existing recipe explicitly.")
+def recipe_save(name, directory, output, force):
+    """Save supported choices from an Envee or legacy Forge project."""
+    try:
+        root = runner.discover(directory)
+        if root is None:
+            raise ValueError("No Envee project found.")
+        manifest = runner.load(root)
+        defaults = Options(name="recipe", preset="python")
+        values = {key: manifest.get(key, getattr(defaults, key)) for key in recipes.KEYS}
+        path = recipes.save(name, values, output, force)
+        console.print(f"Recipe saved: {path}", markup=False)
+    except (ValueError, RuntimeError, OSError) as exc:
+        raise click.ClickException(str(exc)) from exc
+
+
+@recipe.command("remove")
+@click.argument("name")
+@click.option("--yes", is_flag=True, help="Remove without prompting.")
+def recipe_remove(name, yes):
+    """Remove a personal recipe; project files are untouched."""
+    try:
+        path = recipes.personal(name)
+        if not path.is_file():
+            raise ValueError(f"No personal recipe named {name}.")
+        if yes or click.confirm(f"Remove personal recipe {name}?", default=False):
+            path.unlink()
+            console.print(f"Removed recipe: {name}", markup=False)
+    except (ValueError, OSError) as exc:
         raise click.ClickException(str(exc)) from exc
 
 

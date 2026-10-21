@@ -54,14 +54,14 @@ def main():
         os.environ["XDG_CONFIG_HOME"] = str(temporary / "config")
         environment = os.environ.copy()
         environment["ENVEE_PYTHON"] = sys.executable
-        assert "0.3.0" in command(["bash", str(checkout / "envee"), "--version"], checkout, environment)
+        assert "0.4.0" in command(["bash", str(checkout / "envee"), "--version"], checkout, environment)
         project = temporary / "new-project"
         project.mkdir()
         output = command(
             ["bash", str(checkout / "envee")],
             project,
             environment,
-            "4\nn\nn\n2\nacceptance-tool\n\n\n\n\ny\n\n\n\n\n1\nn\n",
+            "4\nn\nn\n2\nacceptance-tool\n\n\n\n\ny\n\n\n\n\n1\nn\nn\n",
         )
         assert "YOUR ENVIRONMENT IS READY" in output
         manifest = json.loads((project / "envee.json").read_text())
@@ -72,12 +72,25 @@ def main():
         status = command(["git", "status", "--porcelain", "--untracked-files=all"], project)
         assert "local.settings.json" not in status and " .env\n" not in status and ".venv/" not in status
         source = (project / "app/main.py").read_bytes()
+        lock_bytes = (project / "requirements.lock").read_bytes()
+        shared = temporary / "team.json"
+        command([str(checkout / ".venv/bin/envee"), "recipe", "save", "team-cli", str(project),
+                 "--output", str(shared)], temporary)
+        recipe = json.loads(shared.read_text())
+        assert "name" not in recipe["options"] and "ponytail" not in recipe["options"]
+        reused = temporary / "recipe-project"
+        command([str(checkout / ".venv/bin/envee"), "init", str(reused), "--recipe", str(shared),
+                 "--yes", "--no-install", "--no-git"], temporary)
+        assert json.loads((reused / "envee.json").read_text())["preset"] == "cli"
         command([str(checkout / ".venv/bin/envee"), "setup", str(project)], project)
         assert (project / "app/main.py").read_bytes() == source
+        assert (project / "requirements.lock").read_bytes() == lock_bytes
         teammate = temporary / "teammate"
         shutil.copytree(project, teammate, ignore=shutil.ignore_patterns(".venv", ".git", ".envee", "__pycache__"))
         command([str(checkout / ".venv/bin/envee"), "setup"], teammate / "app")
         assert (teammate / "app/main.py").read_bytes() == source
+        assert (teammate / "requirements.lock").read_bytes() == lock_bytes
+        assert "Preparing uv" not in (teammate / ".envee/setup.log").read_text()
         assert (teammate / ".env").read_text() == "PLACEHOLDER=true\n"
         assert (teammate / "local.settings.json").read_text() == "{}\n"
         assert "Hello, team!" in command(
@@ -89,7 +102,7 @@ def main():
                           "--preset", "web", "--yes", "--no-git"], temporary)
         assert "YOUR ENVIRONMENT IS READY" in output
         assert command(["node", "--version"], temporary).strip() == active_node
-        wheel = root / "dist/envee-0.3.0-py3-none-any.whl"
+        wheel = root / "dist/envee-0.4.0-py3-none-any.whl"
         wheel_env = temporary / "wheel-env"
         command([sys.executable, "-m", "venv", str(wheel_env)], temporary)
         command([str(wheel_env / "bin/python"), "-m", "pip", "install", str(wheel)], temporary)
@@ -130,6 +143,9 @@ def main():
             "real_interactive_wizard": True,
             "verified_cli_project": True,
             "git_and_secret_exclusions": True,
+            "recipe_file_sharing": True,
+            "retry_and_teammate_setup_preserve_locks": True,
+            "teammate_reuses_lock_without_resolver": True,
             "retry_preserves_source": True,
             "fresh_teammate_setup_preserves_source_and_settings": True,
             "installed_project_command": True,

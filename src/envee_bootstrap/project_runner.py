@@ -1,6 +1,8 @@
 """Standalone generated-project runner. Uses only the Python standard library."""
 
 import argparse
+from contextlib import contextmanager, nullcontext
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -10,11 +12,15 @@ import signal
 import subprocess
 import sys
 import time
+import tempfile
+import tomllib
 from urllib.request import urlopen
 
 PYTHON_KINDS = {"python", "cli", "flask", "fastapi"}
 NODE_KINDS = {"typescript", "azure", "web"}
 OUTPUT_STREAM = None
+STAGE_CALLBACK = None
+UV_VERSION = "0.13.4"
 
 
 def run(args, cwd, timeout=900):
@@ -75,7 +81,8 @@ def load(root):
         raise RuntimeError("Not an Envee project: envee.json (or legacy forge.json) is missing or invalid.") from exc
     if (
         not isinstance(manifest, dict)
-        or manifest.get("schema") != 1
+        or type(manifest.get("schema")) is not int
+        or manifest.get("schema") not in {1, 2}
         or not isinstance(manifest.get("components"), list)
     ):
         raise RuntimeError("Unsupported Envee manifest schema.")
@@ -211,30 +218,239 @@ def check_commands(manifest, kind, py):
     return commands
 
 
+def atomic_write(path, content, mode=None):
+    temporary = None
+    try:
+        with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", newline="\n",
+                                         dir=path.parent, delete=False) as stream:
+            temporary = Path(stream.name)
+            stream.write(content)
+        if mode is not None:
+            temporary.chmod(mode)
+        elif path.exists():
+            shutil.copymode(path, temporary)
+        temporary.replace(path)
+    finally:
+        if temporary:
+            temporary.unlink(missing_ok=True)
+
+
+class SetupProgress:
+    """Advisory progress; never used to skip installation or verification."""
+    def __init__(self, root, stages):
+        self.path = log_directory(root) / "setup-state.json"
+        self.path.parent.mkdir(exist_ok=True)
+        self.state = {"schema": 1, "log": "setup.log" if (self.path.parent / "setup.log").exists() else None,
+                      "stages": [{"name": name, "status": "pending"} for name in stages]}
+
+    @contextmanager
+    def stage(self, name):
+        item = next((item for item in self.state["stages"] if item["name"] == name), None)
+        if item is None:
+            item = {"name": name, "status": "pending"}
+            self.state["stages"].append(item)
+        item["status"] = "running"
+        self.write()
+        print(f"Setup · {name}", flush=True)
+        if STAGE_CALLBACK:
+            STAGE_CALLBACK(name)
+        try:
+            yield
+        except BaseException as exc:
+            item["status"] = "interrupted" if isinstance(exc, KeyboardInterrupt) else "failed"
+            self.write()
+            raise
+        else:
+            item["status"] = "completed"
+            self.write()
+
+    def write(self):
+        atomic_write(self.path, json.dumps(self.state, indent=2) + "\n", mode=0o644)
+
+
+def previous_setup(root):
+    path = log_directory(root) / "setup-state.json"
+    if not path.exists():
+        return []
+    try:
+        state = json.loads(path.read_text(encoding="utf-8"))
+        stages = state["stages"]
+        if state["schema"] != 1 or not isinstance(stages, list) or any(
+            not isinstance(item, dict) or not isinstance(item.get("name"), str) or
+            item.get("status") not in {"pending", "running", "completed", "failed", "interrupted", "warning"}
+            for item in stages
+        ):
+            raise ValueError("Invalid progress")
+        if all(item["status"] == "completed" for item in stages):
+            return []
+        return [f"{item['status'].capitalize()}: {item['name']}" for item in stages]
+    except (OSError, ValueError, KeyError, TypeError):
+        return ["Previous setup progress is unreadable; it is safe to retry setup."]
+
+
+def dependency_fingerprint(cwd):
+    data = tomllib.loads((cwd / "pyproject.toml").read_text(encoding="utf-8")).get("project")
+    if not isinstance(data, dict):
+        raise ValueError("pyproject.toml requires a [project] table.")
+    values = {key: data.get(key) for key in ("requires-python", "dependencies", "optional-dependencies")}
+    return hashlib.sha256(json.dumps(values, sort_keys=True).encode()).hexdigest()
+
+
+def locking_problems(root, manifest, allow_missing=False):
+    if manifest["schema"] == 1:
+        return []
+    problems = []
+    for component in manifest["components"]:
+        cwd = root / component["path"]
+        try:
+            if component["kind"] in PYTHON_KINDS:
+                path = cwd / "requirements.lock"
+                if not path.exists():
+                    if not allow_missing:
+                        problems.append(f"Missing Python lock in {component['path']}. Run envee setup.")
+                elif not path.read_text(encoding="utf-8").startswith(
+                    "# envee-input-sha256: " + dependency_fingerprint(cwd) + "\n"
+                ):
+                    problems.append(f"Python dependencies changed in {component['path']}. Run envee lock.")
+            else:
+                path = cwd / "package-lock.json"
+                if not path.exists():
+                    if not allow_missing:
+                        problems.append(f"Missing npm lock in {component['path']}. Run envee setup.")
+                else:
+                    package = json.loads((cwd / "package.json").read_text(encoding="utf-8"))
+                    lock_data = json.loads(path.read_text(encoding="utf-8"))
+                    if not isinstance(package, dict) or not isinstance(lock_data, dict) or not isinstance(
+                        lock_data.get("packages"), dict
+                    ):
+                        raise ValueError("Invalid npm dependency or lock metadata; refresh with envee lock.")
+                    locked = lock_data["packages"].get("")
+                    if not isinstance(locked, dict) or any(package.get(key, {}) != locked.get(key, {})
+                                             for key in ("dependencies", "devDependencies", "optionalDependencies")):
+                        problems.append(f"Node dependencies changed in {component['path']}. Run envee lock.")
+        except (OSError, ValueError, KeyError, TypeError) as exc:
+            problems.append(f"Cannot validate dependency files in {component['path']}: {exc}")
+    return problems
+
+
+def python_lock(cwd):
+    """Resolve with a disposable tool environment; the application still uses pip."""
+    path = cwd / "requirements.lock"
+    fingerprint = dependency_fingerprint(cwd)
+    print(f"Preparing uv {UV_VERSION} in a temporary tool environment (no Python downloads).", flush=True)
+    with tempfile.TemporaryDirectory(prefix="envee-lock-") as temporary:
+        tool = Path(temporary)
+        run([sys.executable, "-m", "venv", str(tool / ".venv")], cwd)
+        py = python(tool)
+        run([py, "-m", "pip", "install", "--only-binary=:all:", f"uv=={UV_VERSION}"], cwd)
+        output = tool / "requirements.txt"
+        if path.exists():
+            output.write_text(path.read_text(encoding="utf-8"), encoding="utf-8")
+        run([py, "-m", "uv", "pip", "compile", "pyproject.toml", "--extra", "dev",
+             "--universal", "--python-version", "3.12", "--generate-hashes", "--no-header",
+             "--no-annotate", "--no-config", "--no-python-downloads", "--output-file", str(output)], cwd)
+        if dependency_fingerprint(cwd) != fingerprint:
+            raise RuntimeError("Dependencies changed while locking. Retry envee lock.")
+        content = ("# envee-input-sha256: " + fingerprint + "\n"
+                   f"# Generated with uv {UV_VERSION}; refresh with envee lock.\n" +
+                   output.read_text(encoding="utf-8"))
+        atomic_write(path, content, mode=0o644)
+
+
+def node_lock(cwd, local):
+    package_before = (cwd / "package.json").read_bytes()
+    with tempfile.TemporaryDirectory(prefix="envee-npm-lock-") as temporary:
+        stage = Path(temporary)
+        for name in ("package.json", "package-lock.json", ".npmrc"):
+            if (cwd / name).exists():
+                shutil.copy2(cwd / name, stage / name)
+        args = ["npm", "install", "--package-lock-only", "--ignore-scripts", "--no-fund", "--no-audit"]
+        if local:
+            args[0] = executable("npm")
+        else:
+            args = ["docker", "run", "--rm", "--user",
+                    f"{os.getuid()}:{os.getgid()}" if hasattr(os, "getuid") else "0:0",
+                    "--env", "HOME=/tmp", "--mount", f"type=bind,source={stage},target=/workspace",
+                    "--workdir", "/workspace", "node:22-bookworm-slim", *args]
+        run(args, stage)
+        content = (stage / "package-lock.json").read_text(encoding="utf-8")
+        json.loads(content)
+        if (cwd / "package.json").read_bytes() != package_before:
+            raise RuntimeError("Dependencies changed while locking. Retry envee lock.")
+        atomic_write(cwd / "package-lock.json", content, mode=0o644)
+
+
+def lock(root, manifest, local, refresh=True):
+    if manifest["schema"] != 2:
+        raise RuntimeError("Locking is available for new Envee 0.4 projects; this project's setup is unchanged.")
+    if not refresh:
+        problems = locking_problems(root, manifest, allow_missing=True)
+        if problems:
+            raise RuntimeError("\n".join(problems))
+    for component in manifest["components"]:
+        cwd = root / component["path"]
+        if component["kind"] in PYTHON_KINDS:
+            if refresh or not (cwd / "requirements.lock").exists():
+                if local:
+                    python_lock(cwd)
+                else:
+                    code = ("import runpy,sys; from pathlib import Path; "
+                            "r=runpy.run_path('scripts/project.py'); "
+                            "r['python_lock'](Path('/workspace')/sys.argv[1])")
+                    run(["docker", "run", "--rm", "--user",
+                         f"{os.getuid()}:{os.getgid()}" if hasattr(os, "getuid") else "0:0",
+                         "--env", "HOME=/tmp", "--mount", f"type=bind,source={root},target=/workspace",
+                         "--workdir", "/workspace", "python:3.12-slim-bookworm", "python", "-c", code,
+                         component["path"]], root)
+        elif refresh or not (cwd / "package-lock.json").exists():
+            node_lock(cwd, local)
+
+
 def setup(root, manifest, local, skip_runtime=False):
-    """Install and verify; preserve existing sources and settings."""
-    preflight(manifest, local, skip_runtime)
-    if not local and manifest["environment"] == "devcontainer":
-        devcontainer(root, manifest, "setup", skip_runtime, build=True)
-        return
+    """Install and verify; progress is advisory and application files stay intact."""
+    container = not local and manifest["environment"] == "devcontainer"
+    stages = ["Prerequisites"]
+    if container:
+        stages += ["Dev Container setup and verification"]
+    else:
+        if manifest["schema"] == 2:
+            stages += ["Dependency locks"]
+        stages += ([f"Install {c['kind']} ({c['path']})" for c in manifest["components"]]
+                   if local else ["Build application images"])
+        stages += ["Selected checks"] + ([] if skip_runtime else ["Startup verification"])
+    progress = SetupProgress(root, stages)
+    with progress.stage("Prerequisites"):
+        preflight(manifest, local, skip_runtime)
+    if container:
+        with progress.stage("Dev Container setup and verification"):
+            devcontainer(root, manifest, "setup", skip_runtime, build=True)
+        return progress
+    if manifest["schema"] == 2:
+        with progress.stage("Dependency locks"):
+            lock(root, manifest, local, refresh=False)
     if not local:
-        docker_locks(root, manifest)
-        run(["docker", "compose", "build"], root, timeout=1800)
+        with progress.stage("Build application images"):
+            if manifest["schema"] == 1:
+                docker_locks(root, manifest)
+            run(["docker", "compose", "build"], root, timeout=1800)
     else:
         for c in manifest["components"]:
             cwd = root / c["path"]
-            print(f"Installing {c['kind']} ({c['path']})", flush=True)
-            if c["kind"] in PYTHON_KINDS:
-                if not (cwd / ".venv").exists():
-                    run([sys.executable, "-m", "venv", ".venv"], cwd)
-                py = python(cwd)
-                run([py, "-m", "pip", "install", "-r", "requirements.txt"], cwd)
-                run([py, "-m", "pip", "install", "-e", "."], cwd)
-            else:
-                command = "ci" if (cwd / "package-lock.json").exists() else "install"
-                run([executable("npm"), command, "--no-fund", "--no-audit"], cwd)
-            settings(cwd, c["kind"])
-    check(root, manifest, local, skip_runtime)
+            with progress.stage(f"Install {c['kind']} ({c['path']})"):
+                if c["kind"] in PYTHON_KINDS:
+                    if not (cwd / ".venv").exists():
+                        run([sys.executable, "-m", "venv", ".venv"], cwd)
+                    py = python(cwd)
+                    args = [py, "-m", "pip", "install"]
+                    run([*args, *(["--require-hashes"] if manifest["schema"] == 2 else []),
+                         "-r", "requirements.txt"], cwd)
+                    run([*args, *(["--no-deps"] if manifest["schema"] == 2 else []), "-e", "."], cwd)
+                else:
+                    command = "ci" if (cwd / "package-lock.json").exists() else "install"
+                    run([executable("npm"), command, "--no-fund", "--no-audit"], cwd)
+                settings(cwd, c["kind"])
+    check(root, manifest, local, skip_runtime, progress)
+    return progress
 
 
 def settings(cwd, kind):
@@ -284,37 +500,43 @@ def service_name(manifest, c):
     return "backend" if manifest["preset"].startswith("fullstack-") else "app"
 
 
-def check(root, manifest, local, skip_runtime=False):
+def check(root, manifest, local, skip_runtime=False, progress=None):
     """Run builds, selected tools and a live startup smoke check."""
-    preflight(manifest, local, skip_runtime)
     if not local and manifest["environment"] == "devcontainer":
+        preflight(manifest, local, skip_runtime)
         devcontainer(root, manifest, "check", skip_runtime)
         return
-    for c in manifest["components"]:
-        cwd = root / c["path"]
-        py = python(cwd) if local and c["kind"] in PYTHON_KINDS else "python"
-        for args in check_commands(manifest, c["kind"], py):
-            if local:
-                if args[0] == "npm":
-                    args[0] = executable("npm")
-                run(args, cwd)
-            else:
-                run(
-                    [
-                        "docker",
-                        "compose",
-                        "run",
-                        "--rm",
-                        "--no-deps",
-                        "--entrypoint",
-                        args[0],
-                        service_name(manifest, c),
-                        *args[1:],
-                    ],
-                    root,
-                )
+    with progress.stage("Selected checks") if progress else nullcontext():
+        preflight(manifest, local, skip_runtime)
+        problems = locking_problems(root, manifest)
+        if problems:
+            raise RuntimeError("\n".join(problems))
+        for c in manifest["components"]:
+            cwd = root / c["path"]
+            py = python(cwd) if local and c["kind"] in PYTHON_KINDS else "python"
+            for args in check_commands(manifest, c["kind"], py):
+                if local:
+                    if args[0] == "npm":
+                        args[0] = executable("npm")
+                    run(args, cwd)
+                else:
+                    run(
+                        [
+                            "docker",
+                            "compose",
+                            "run",
+                            "--rm",
+                            "--no-deps",
+                            "--entrypoint",
+                            args[0],
+                            service_name(manifest, c),
+                            *args[1:],
+                        ],
+                        root,
+                    )
     if not skip_runtime:
-        smoke(root, manifest, local)
+        with progress.stage("Startup verification") if progress else nullcontext():
+            smoke(root, manifest, local)
     print("Project checks passed" + (" (live startup skipped)" if skip_runtime else ""), flush=True)
 
 
@@ -463,6 +685,9 @@ def dev(root, manifest, local):
               "Inside the container, run: python3 scripts/project.py dev --local", flush=True)
         return
     preflight(manifest, local)
+    problems = locking_problems(root, manifest)
+    if problems:
+        raise RuntimeError("\n".join(problems))
     urls = endpoints(manifest)
     if not urls:
         if local:
@@ -584,7 +809,8 @@ def devcontainer(root, manifest, action, skip_runtime, build=False):
 
 def main():
     parser = argparse.ArgumentParser(description="Install, check or run this Envee project.")
-    parser.add_argument("action", choices=["setup", "check", "dev"])
+    parser.add_argument("action", choices=["setup", "check", "dev", "lock"])
+    parser.add_argument("--check", action="store_true", help="Validate locks without changes.")
     parser.add_argument("--local", action="store_true", help="Use local tools instead of Docker.")
     parser.add_argument("--skip-runtime", action="store_true", help="Skip live startup (useful in CI).")
     args = parser.parse_args()
@@ -600,6 +826,17 @@ def main():
             setup(root, manifest, local, args.skip_runtime)
         elif args.action == "check":
             check(root, manifest, local, args.skip_runtime)
+        elif args.action == "lock":
+            if args.check:
+                if manifest["schema"] != 2:
+                    raise RuntimeError("Locking requires a new Envee 0.4 project.")
+                problems = locking_problems(root, manifest)
+                if problems:
+                    raise RuntimeError("\n".join(problems))
+                print("Dependency locks are current.")
+            else:
+                preflight(manifest, local, skip_runtime=True)
+                lock(root, manifest, local)
         else:
             dev(root, manifest, local)
     except KeyboardInterrupt:

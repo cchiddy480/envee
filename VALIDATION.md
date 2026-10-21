@@ -20,10 +20,12 @@ Verified on 21 October 2026.
 Release-specific evidence: [validation/envee-0.4.0.json](validation/envee-0.4.0.json).
 The [hosted contract and shared-lock checks](https://github.com/cchiddy480/envee/actions/runs/39587687258)
 pass across the six OS/Python combinations, including real installation, incorrect-hash rejection
-and explicit lock refresh retaining compatible pins. The [Linux ten-starter matrix](https://github.com/cchiddy480/envee/actions/runs/39587001828)
+and explicit lock refresh retaining compatible pins. The [Linux ten-starter matrix](https://github.com/cchiddy480/envee/actions/runs/39587687258)
 also passes.
 
-Homebrew source installation, formula style and formula tests pass on Apple Silicon.
+Homebrew source installation from the public release URL, formula style and formula tests
+pass on Apple Silicon. The [hosted fresh tap installation](https://github.com/cchiddy480/homebrew-envee/actions/runs/39588840532)
+also passes.
 A real terminal session using Homebrew Python verifies application creation, the recipe-save
 prompt and arrow-key selection of the saved setup; previewing that recipe creates no project.
 

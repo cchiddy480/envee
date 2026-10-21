@@ -169,7 +169,7 @@
   "linux_starters": {
     "passed": true,
     "presets": 10,
-    "url": "https://github.com/cchiddy480/envee/actions/runs/39587001828"
+    "url": "https://github.com/cchiddy480/envee/actions/runs/39587687258"
   },
   "homebrew": {
     "source_install": true,
@@ -178,6 +178,13 @@
     "verified_project_using_homebrew_python": true,
     "terminal_recipe_save": true,
     "terminal_arrow_key_selection": true,
-    "recipe_preview_does_not_create_project": true
-  }
+    "recipe_preview_does_not_create_project": true,
+    "public_release_source_install": true,
+    "hosted_fresh_install": {
+      "passed": true,
+      "url": "https://github.com/cchiddy480/homebrew-envee/actions/runs/39588840532"
+    }
+  },
+  "source_workflow_passed": true,
+  "release_archive_sha256": "e2d73cf00afb4e49912dec734df277f20924b2b43c62fb6c2fdc31c4bab8f3bd"
 }
